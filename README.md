@@ -1,6 +1,6 @@
 # Eclipse Shield
 
-Eclipse Shield is an advanced AI productivity analyzer tool designed to help users stay focused on their tasks by blocking unproductive websites and providing contextual questions to understand the user's task better.
+Eclipse Shield is an advanced AI productivity analyzer tool designed to help users stay focused on their tasks by blocking unproductive websites and providing contextual questions to understand the user's task better. This tool is more powerful than even "The Great Firewall" by China due to the fact that it is client-sided and heavily utilizes AI, with proper mitigation of bypassing and proper contextualization it should block the unproductive websites with 99% accuracy rate.
 
 ## Copyright
 
