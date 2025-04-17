@@ -5,7 +5,9 @@
   "permissions": [
     "activeTab",
     "storage",
-    "declarativeNetRequest"
+    "declarativeNetRequest",
+    "webNavigation",
+    "tabs"
   ],
   "action": {
     "default_popup": "redirect.html",
@@ -17,18 +19,11 @@
     "type": "module"
   },
   "host_permissions": [
+    "*://*/*",
     "http://localhost:5000/*",
-    "http://127.0.0.1:5000/*",
-    "<all_urls>"
+    "http://127.0.0.1:5000/*"
   ],
-  "declarative_net_request": {
-    "rule_resources": [{
-      "id": "ruleset_1",
-      "enabled": true,
-      "path": "rules.json"
-    }]
-  },
-  "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'"
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
   }
 }

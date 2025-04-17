@@ -1,264 +1,307 @@
-let blockData = {};
-let sessionContext = {};
-let analyzedUrls = new Map(); // Change to Map to store productivity status
-let analysisInProgress = new Set();
+// Track analyzing state
+let isAnalyzing = false;
+let activeUrls = new Set();
 
-// Add initialization on extension load
-chrome.runtime.onInstalled.addListener(async () => {
-    await updateDefaultBlock();
+// Initialize storage
+chrome.storage.local.get(['blockedUrls', 'allowedUrls'], (data) => {
+    if (!data.blockedUrls) {
+        chrome.storage.local.set({ blockedUrls: {} });
+    }
+    if (!data.allowedUrls) {
+        chrome.storage.local.set({ allowedUrls: {} });
+    }
 });
 
-async function updateDefaultBlock() {
-    try {
-        const { sessionData } = await chrome.storage.local.get('sessionData');
-        if (!sessionData?.active) {
-            await chrome.declarativeNetRequest.updateDynamicRules({
-                removeRuleIds: [100],
-                addRules: [{
-                    id: 100,
-                    priority: 2,
-                    action: {
-                        type: "redirect",
-                        redirect: {
-                            url: `http://localhost:5000/block?reason=no-session&t=${Date.now()}`
-                        }
-                    },
-                    condition: {
-                        urlFilter: "*",
-                        resourceTypes: ["main_frame"],
-                        excludedRequestDomains: ["localhost", "127.0.0.1"],
-                        excludedInitiatorDomains: [chrome.runtime.id]
+// Verify storage is working
+chrome.storage.local.get(null, (data) => {
+    console.log('Current storage state:', data);
+});
+
+// Add complete cleanup function
+function cleanupAllData() {
+    return new Promise((resolve) => {
+        // Clear all chrome storage
+        chrome.storage.local.clear(() => {
+            // Reset all state variables
+            isAnalyzing = false;
+            activeUrls.clear();
+            
+            // Clear any other extension storage
+            chrome.storage.session?.clear?.();
+            
+            // Query and reload all tabs
+            chrome.tabs.query({}, (tabs) => {
+                tabs.forEach(tab => {
+                    if (!tab.url.startsWith('chrome://') && 
+                        !tab.url.startsWith('chrome-extension://')) {
+                        chrome.tabs.update(tab.id, {
+                            url: chrome.runtime.getURL('block.html') + 
+                                '?reason=no-session' +
+                                `&url=${encodeURIComponent(tab.url)}` +
+                                `&original_url=${encodeURIComponent(tab.url)}`
+                        });
                     }
-                }]
+                });
+                resolve();
             });
-        }
-    } catch (error) {
-        console.error('Error setting default block:', error);
-    }
+        });
+    });
 }
 
-// Update initialization function
-async function initializeSession(domain, endTime) {
-    try {
-        // Clear previous state
-        analyzedUrls.clear(); // Clear previous analysis results
-        analysisInProgress.clear();
-        await chrome.storage.local.remove(['productiveUrls']);
-        
-        // Remove existing rules
-        await chrome.declarativeNetRequest.updateDynamicRules({
-            removeRuleIds: [100]
-        });
-
-        // Set up new session
-        await chrome.storage.local.set({
-            sessionData: {
-                active: true,
-                domain: domain,
-                startTime: Date.now()
-            },
-            blockData: {
-                endTime: endTime,
-                blockedDomains: []
+// Add session timeout checker
+function checkSessionTimeout() {
+    chrome.storage.local.get(['sessionData'], (data) => {
+        if (data.sessionData?.endTime && data.sessionData.state === 'active') {
+            if (Date.now() >= data.sessionData.endTime) {
+                console.log('Session expired, performing complete cleanup');
+                cleanupAllData();
             }
-        });
-
-        console.log('Session initialized for domain:', domain);
-    } catch (error) {
-        console.error('Error initializing session:', error);
-        throw error;
-    }
-}
-
-// Add session cleanup
-async function endSession() {
-    await chrome.storage.local.remove(['sessionData', 'blockData']);
-    await updateDefaultBlock();
-}
-
-// Add tab monitoring
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-    if (changeInfo.url) {
-        const { sessionData } = await chrome.storage.local.get('sessionData');
-        if (sessionData?.active) {
-            analyzeAndBlockIfNeeded(changeInfo.url, sessionData.domain, tabId);
         }
-    }
-});
+    });
+}
 
-// Add helper function to clean URLs
-function getDomainFromUrl(url) {
+// Check session timeout every minute
+setInterval(checkSessionTimeout, 60000);
+
+// Add immediate check when extension loads
+checkSessionTimeout();
+
+// Add URL normalization function
+function normalizeUrl(url) {
     try {
         const urlObj = new URL(url);
-        return urlObj.hostname;
+        // Remove common tracking parameters
+        urlObj.searchParams.delete('utm_source');
+        urlObj.searchParams.delete('utm_medium');
+        urlObj.searchParams.delete('utm_campaign');
+        // Remove trailing slashes and convert to lowercase
+        return urlObj.toString().toLowerCase().replace(/\/$/, '');
     } catch (e) {
-        console.error('Invalid URL:', url);
+        console.error('URL normalization error:', e);
+        return url.toLowerCase();
+    }
+}
+
+// Add URL state tracking
+function isBlockPage(url) {
+    return url.includes('block.html');
+}
+
+function getBlockPageReason(url) {
+    try {
+        const params = new URLSearchParams(new URL(url).search);
+        return params.get('reason');
+    } catch (e) {
         return null;
     }
 }
 
-function isBlockPage(url) {
-    return url.startsWith('chrome-extension://') && url.includes('/block.html');
-}
+// Update URL monitoring
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+    if (changeInfo.status === 'loading' && tab.url) {
+        console.log('Processing URL:', tab.url);
+        
+        try {
+            // Skip if this is already a block page
+            if (isBlockPage(tab.url)) {
+                const reason = getBlockPageReason(tab.url);
+                console.log('Already on block page with reason:', reason);
+                if (reason === 'blocked' || reason === 'no-session') {
+                    return; // Don't reprocess blocked or no-session pages
+                }
+            }
 
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.type === 'setBlock') {
-        const { url, endTime } = request.data;
-        updateBlockRules(url, endTime);
-        blockData = request.data;
-        chrome.storage.local.set({ blockData });
-        sendResponse({ success: true });
-        return true;
-    }
-    
-    if (request.type === 'checkBlock') {
-        const isBlocked = isUrlBlocked(request.url);
-        sendResponse({ isBlocked });
-        return true;
-    }
+            // Skip other internal URLs
+            if (tab.url.startsWith('chrome://') || 
+                tab.url.startsWith('chrome-extension://') || 
+                tab.url.includes('localhost:5000')) {
+                return;
+            }
 
-    if (request.type === 'analyze') {
-        fetch('http://localhost:5000/analyze', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(request.data)
-        })
-        .then(response => response.json())
-        .then(data => sendResponse(data))
-        .catch(error => sendResponse({ error: error.message }));
-        return true;
-    }
+            // Get all necessary data atomically
+            const data = await chrome.storage.local.get(['sessionData', 'blockedUrls', 'allowedUrls']);
+            const { sessionData, blockedUrls, allowedUrls } = data;
+            
+            if (!sessionData || sessionData.state !== 'active') {
+                console.log('No active session');
+                await chrome.tabs.update(tabId, {
+                    url: chrome.runtime.getURL('block.html') + 
+                        '?reason=no-session' +
+                        `&url=${encodeURIComponent(tab.url)}` +
+                        `&original_url=${encodeURIComponent(tab.url)}`
+                });
+                return;
+            }
 
-    if (request.type === 'initializeSession') {
-        const { domain, endTime } = request.data;
-        initializeSession(domain, endTime)
-            .then(() => sendResponse({ success: true }))
-            .catch(error => sendResponse({ error: error.message }));
-        return true;
+            // Normalize the URL for consistent comparison
+            const normalizedUrl = normalizeUrl(tab.url);
+            const urlKey = `${normalizedUrl}-${sessionData.startTime}`;
+
+            console.log('Checking URL:', {
+                original: tab.url,
+                normalized: normalizedUrl,
+                key: urlKey,
+                blockedUrls: blockedUrls
+            });
+
+            // Check if URL was previously allowed - important to check first
+            if (allowedUrls && allowedUrls[urlKey]) {
+                console.log('URL was previously allowed:', tab.url);
+                activeUrls.delete(tab.url); // Clean up tracking
+                return; // Let the navigation continue without interruption
+            }
+
+            // Check if URL was previously blocked
+            if (blockedUrls && blockedUrls[urlKey]) {
+                console.log('URL was previously blocked:', normalizedUrl);
+                if (!isBlockPage(tab.url) || getBlockPageReason(tab.url) !== 'blocked') {
+                    await chrome.tabs.update(tabId, {
+                        url: chrome.runtime.getURL('block.html') + 
+                            '?reason=blocked' +
+                            `&url=${encodeURIComponent(tab.url)}` +
+                            `&original_url=${encodeURIComponent(tab.url)}` +
+                            `&domain=${encodeURIComponent(sessionData.domain)}` +
+                            `&explanation=${encodeURIComponent(blockedUrls[urlKey].reason)}`
+                    });
+                }
+                return;
+            }
+
+            // Only analyze if URL isn't being processed
+            if (!activeUrls.has(tab.url)) {
+                activeUrls.add(tab.url);
+                await chrome.tabs.update(tabId, {
+                    url: chrome.runtime.getURL('block.html') + 
+                        '?reason=analyzing' +
+                        `&url=${encodeURIComponent(tab.url)}` +
+                        `&original_url=${encodeURIComponent(tab.url)}` +
+                        `&domain=${encodeURIComponent(sessionData.domain)}` +
+                        `&context=${encodeURIComponent(JSON.stringify(sessionData.context || []))}`
+                });
+            }
+
+        } catch (error) {
+            console.error('Error:', error);
+            activeUrls.delete(tab.url);
+        }
     }
 });
 
-async function analyzeAndBlockIfNeeded(url, domain, tabId) {
-    try {
-        if (url.startsWith('chrome-extension://') || url.startsWith('chrome://')) {
-            return;
-        }
+// Clear analyzed URLs periodically
+setInterval(() => {
+    analyzedUrls.clear();
+}, 60000); // Clear every minute
 
-        const urlKey = `${url}-${domain}`;
+// Add tab creation listener
+chrome.tabs.onCreated.addListener(async (tab) => {
+    // Handle new tab creation immediately
+    console.log('New tab created:', tab);
+    
+    // Check if it's a new tab page and no active session
+    if (tab.pendingUrl === 'chrome://newtab/' || tab.url === 'chrome://newtab/') {
+        const data = await chrome.storage.local.get(['sessionData']);
         
-        // Check if already analyzed
-        if (analyzedUrls.has(urlKey)) {
-            const isProductive = analyzedUrls.get(urlKey);
-            if (!isProductive) {
-                await showBlockPage(tabId);
-            }
-            return;
+        // Only block new tab if there's no active session
+        if (!data.sessionData || data.sessionData.state !== 'active') {
+            const noSessionBlockUrl = chrome.runtime.getURL('block.html') + 
+                `?reason=no-session` +
+                `&url=${encodeURIComponent('chrome://newtab/')}` +
+                `&original_url=${encodeURIComponent('chrome://newtab/')}`;
+            
+            await chrome.tabs.update(tab.id, { url: noSessionBlockUrl });
         }
-
-        // Show analyzing page
-        await chrome.tabs.update(tabId, { 
-            url: chrome.runtime.getURL('block.html?reason=analyzing') 
-        });
-
-        const response = await fetch('http://localhost:5000/analyze', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url, domain })
-        });
-
-        const data = await response.json();
-        console.log('Analysis result:', data); // Debug log
-
-        // Store result
-        analyzedUrls.set(urlKey, data.isProductive);
-
-        if (data.isProductive) {
-            // Allow access to productive sites
-            console.log('Site is productive, allowing access:', url);
-            await chrome.tabs.update(tabId, { url });
-        } else {
-            // Block unproductive sites
-            console.log('Site is not productive, blocking:', url);
-            const { blockData } = await chrome.storage.local.get('blockData');
-            if (blockData?.endTime > Date.now()) {
-                const blockedDomains = new Set(blockData.blockedDomains || []);
-                blockedDomains.add(getDomainFromUrl(url));
-                
-                await updateBlockRules(Array.from(blockedDomains), blockData.endTime);
-                await showBlockPage(tabId);
-            }
-        }
-    } catch (error) {
-        console.error('Error analyzing URL:', error);
-        // On error, return to original URL
-        await chrome.tabs.update(tabId, { url });
+        // If there is an active session, let the custom newtab page handle it
     }
-}
+});
 
-async function showBlockPage(tabId, reason = 'blocked') {
-    await chrome.tabs.update(tabId, { 
-        url: `http://localhost:5000/block?reason=${reason}&t=${Date.now()}`
-    });
-}
+// Handle messages from popup
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log('Received message:', message);
 
-async function updateBlockRules(blockedDomains, endTime) {
-    try {
-        await chrome.declarativeNetRequest.updateDynamicRules({
-            removeRuleIds: [100],
-            addRules: [{
-                id: 100,
-                priority: 2,
-                action: {
-                    type: "redirect",
-                    redirect: {
-                        url: `http://localhost:5000/block?reason=blocked&t=${Date.now()}`
-                    }
-                },
-                condition: {
-                    domains: blockedDomains,
-                    resourceTypes: ["main_frame"],
-                    excludedRequestDomains: ["localhost", "127.0.0.1"]
-                }
-            }]
+    if (message.type === 'URL_BLOCKED') {
+        // Store blocked URL with session ID and reason
+        chrome.storage.local.get(['blockedUrls', 'sessionData'], (data) => {
+            const blockedUrls = data.blockedUrls || {};
+            const normalizedUrl = normalizeUrl(message.url);
+            const urlKey = `${normalizedUrl}-${data.sessionData.startTime}`;
+            blockedUrls[urlKey] = {
+                timestamp: Date.now(),
+                reason: message.reason,
+                originalUrl: message.url
+            };
+            chrome.storage.local.set({ blockedUrls });
         });
+    }
 
-        await chrome.storage.local.set({
-            blockData: {
-                endTime,
-                blockedDomains
-            }
+    if (message.type === 'URL_ALLOWED') {
+        chrome.storage.local.get(['allowedUrls', 'sessionData'], (data) => {
+            const allowedUrls = data.allowedUrls || {};
+            const urlKey = `${message.url}-${data.sessionData.startTime}`;
+            allowedUrls[urlKey] = {
+                timestamp: Date.now()
+            };
+            chrome.storage.local.set({ allowedUrls });
         });
-    } catch (error) {
-        console.error('Error updating block rules:', error);
     }
-}
 
-// Update block check function
-function isUrlBlocked(url) {
-    const domain = getDomainFromUrl(url);
-    return domain && blockData.domain === domain && Date.now() < blockData.endTime;
-}
-
-// Check and update block rules periodically
-setInterval(async () => {
-    const { blockData } = await chrome.storage.local.get('blockData');
-    if (blockData?.endTime && blockData.endTime <= Date.now()) {
-        await endSession();
-    }
-}, 1000);
-
-async function analyzeCurrentTab() {
-    try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (message.type === 'START_SESSION') {
+        // Clear previous session's blocked URLs when starting new session
+        chrome.storage.local.set({ blockedUrls: {} });
         
-        // Skip blocking for extension pages
-        if (tab.url.startsWith('chrome-extension://')) {
-            return;
-        }
+        const sessionData = {
+            state: 'active',
+            startTime: Date.now(),
+            endTime: Date.now() + message.duration,
+            domain: message.domain,
+            context: message.context // Store context with session
+        };
+        
+        // Store complete session data
+        chrome.storage.local.set({
+            sessionData: sessionData,
+            domain: message.domain,
+            context: message.context,
+            sessionDuration: message.duration
+        }, () => {
+            if (chrome.runtime.lastError) {
+                console.error('Storage error:', chrome.runtime.lastError);
+                sendResponse({ success: false, error: chrome.runtime.lastError });
+                return;
+            }
+            
+            // Verify storage
+            chrome.storage.local.get(null, (data) => {
+                console.log('Complete storage state after START_SESSION:', data);
+                sendResponse({ success: true, data: data });
+            });
+        });
 
-        // Rest of the analysis logic
-        // ...existing code...
-    } catch (error) {
-        console.error('Error analyzing tab:', error);
+        return true; // Keep message channel open
     }
-}
+
+    if (message.type === 'END_SESSION') {
+        cleanupAllData().then(() => {
+            sendResponse({ success: true });
+        });
+        return true;
+    }
+
+    // Debug storage command
+    if (message.type === 'DEBUG_STORAGE') {
+        chrome.storage.local.get(null, (data) => {
+            console.log('Current storage contents:', data);
+            sendResponse({ success: true, data: data });
+        });
+    }
+
+    return true; // Keep message channel open for async response
+});
+
+// Handle storage changes
+chrome.storage.onChanged.addListener((changes, namespace) => {
+    for (let [key, { oldValue, newValue }] of Object.entries(changes)) {
+        console.log(`Storage key "${key}" changed:`, 
+            '\nOld:', oldValue,
+            '\nNew:', newValue);
+    }
+});

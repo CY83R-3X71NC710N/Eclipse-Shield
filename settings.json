@@ -1,25 +1,120 @@
 {
     "domains": {
         "school": {
-            "lms_platforms": ["canvas", "blackboard", "moodle"],
-            "productivity_tools": ["wolframalpha", "desmos", "khan_academy"],
+            "lms_platforms": [
+                "canvas",
+                "blackboard",
+                "moodle",
+                "classroom.google.com",
+                "google.classroom.com",
+                "classroom.google",
+                "classroom"
+            ],
+            "productivity_tools": [
+                "wolframalpha",
+                "desmos",
+                "khan_academy",
+                "quizlet",
+                "symbolab",
+                "chegg",
+                "studyblue"
+            ],
             "ai_tools": ["chatgpt"],
-            "blocked_keywords": ["games", "social", "entertainment", "streaming"],
-            "blocked_categories": ["social_media", "gambling", "adult_content"],
-            "blocked_specific": ["youtube.com", "reddit.com", "facebook.com", "twitter.com"]
+            "blocked_keywords": [
+                "games",
+                "social",
+                "entertainment",
+                "streaming",
+                "unblocked",
+                "proxy",
+                "bypass"
+            ],
+            "blocked_categories": [
+                "social_media",
+                "gambling",
+                "adult_content",
+                "gaming"
+            ],
+            "blocked_specific": [
+                "youtube.com",
+                "reddit.com",
+                "facebook.com",
+                "twitter.com",
+                "instagram.com",
+                "tiktok.com"
+            ]
         },
         "work": {
-            "productivity_tools": ["slack", "zoom", "notion", "trello"],
-            "ai_tools": ["chatgpt", "gemini", "bard", "copilot", "claude"],
-            "blocked_categories": ["social_media", "gambling", "adult_content"],
-            "blocked_specific": ["youtube.com", "reddit.com", "facebook.com", "twitter.com"]
+            "productivity_tools": [
+                "slack",
+                "zoom",
+                "notion",
+                "trello",
+                "asana",
+                "jira",
+                "confluence",
+                "microsoft365",
+                "office"
+            ],
+            "ai_tools": [
+                "chatgpt",
+                "gemini",
+                "bard",
+                "copilot",
+                "claude"
+            ],
+            "blocked_keywords": [
+                "games",
+                "social",
+                "entertainment",
+                "streaming",
+                "unblocked",
+                "proxy",
+                "bypass"
+            ],
+            "blocked_categories": [
+                "social_media",
+                "gambling",
+                "adult_content",
+                "gaming"
+            ],
+            "blocked_specific": [
+                "youtube.com",
+                "reddit.com",
+                "facebook.com",
+                "twitter.com",
+                "instagram.com",
+                "tiktok.com"
+            ]
         },
         "personal": {
             "contextualization_required": true,
-            "base_blocked_categories": ["adult_content", "gambling"],
+            "base_blocked_categories": [
+                "adult_content",
+                "gambling"
+            ],
             "flexibility_level": "high",
-            "ai_tools": ["chatgpt", "gemini", "bard", "copilot", "claude"],
-            "productivity_tools": ["notion", "evernote", "todoist"]
+            "ai_tools": [
+                "chatgpt",
+                "gemini",
+                "bard",
+                "copilot",
+                "claude"
+            ],
+            "productivity_tools": [
+                "notion",
+                "evernote",
+                "todoist",
+                "calendar",
+                "remember_the_milk"
+            ],
+            "blocked_keywords": [
+                "unblocked",
+                "proxy",
+                "bypass",
+                "hack"
+            ],
+            "blocked_specific": []
         }
     }
 }

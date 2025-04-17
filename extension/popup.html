@@ -21,19 +21,23 @@
 
         html, body {
             width: 500px;
-            height: 300px; /* Adjusted height to ensure bottom border is visible */
-            padding: 15px 15px 20px 15px; /* Added bottom padding */
+            height: 300px;
+            padding: 15px;
             margin: 0;
-            box-sizing: border-box; /* Added box-sizing to include padding and border in the element's total width and height */
-            overflow: hidden; /* Prevent scrollbars */
+            box-sizing: border-box;
+            overflow: hidden;
             background-color: #000;
-            display: flex;
-            flex-direction: column;
         }
 
-        body, button, select, input, a {
-            -webkit-user-select: none;
-            user-select: none;
+        #matrix-rain {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+            opacity: 1;
         }
 
         body {
@@ -42,11 +46,37 @@
             position: relative;
             border: 1px solid #0f0;
             box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
-            margin: 0;
-            padding: 0px;
-            min-height: 320px; /* Adjusted height to ensure bottom border is visible */
             display: flex;
             flex-direction: column;
+            overflow: hidden;
+            background-color: transparent;
+        }
+
+        #domainSelect, #contextQuestions, #analysisSection {
+            position: relative;
+            z-index: 1;
+            background: rgba(0, 0, 0, 0.7);
+        }
+
+        .hidden {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+
+        #analysisSection.hidden,
+        #analysisResult.hidden,
+        #result.hidden {
+            display: none !important;
+            visibility: hidden !important;
+            position: absolute !important;
+            z-index: -1 !important;
+        }
+
+        body, button, select, input, a {
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         .custom-cursor, .cursor-dot {
@@ -84,35 +114,88 @@
             font-weight: bold;
         }
 
-        /* Analysis section h3 */
+        /* Main content containers */
+        #domainSelect, #contextQuestions {
+            width: 100%;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        /* Analysis section styling */
+        #analysisResult {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 1000;
+            margin: 0;
+            padding: 0;
+        }
+
         #analysisResult h3 {
             color: #0f0;
             text-transform: uppercase;
-            letter-spacing: 2px;
+            letter-spacing: 3px;
             text-shadow: 0 0 10px #0f0;
-            position: relative;
-            /* overflow: hidden; Removed overflow: hidden; from h3 */
-            font-size: 16px;
-            margin-top: 5px;
-            margin-bottom: 10px;
-            margin-left: 150px; /* Center the title */
+            margin: 30px 0 40px 0;
+            padding: 0;
+            text-align: center;
+            font-size: 36px;
+            font-weight: bold;
+            animation: text-glow 2s infinite, title-appear 0.5s ease-out forwards;
         }
 
-        /* Remove or comment out the h3::after style */
-        /*h3::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, #0f0, transparent);
-            animation: scan-line 2s linear infinite;
-        }*/
+        .result {
+            width: 80%;
+            max-width: 800px;
+            margin: 0;
+            padding: 40px;
+            border: 2px solid;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 28px;
+            letter-spacing: 2px;
+            line-height: 1.6;
+            position: relative;
+            overflow: hidden;
+            animation: result-appear 0.5s ease-out forwards;
+            background: rgba(0, 0, 0, 0.7);
+            animation: text-glow 2s infinite;
+        }
 
-        @keyframes scan-line {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
+        .productive {
+            background-color: rgba(0, 26, 0, 0.8);
+            border-color: #0f0;
+            color: #0f0;
+            box-shadow: 0 0 25px rgba(0, 255, 0, 0.3);
+        }
+
+        .not-productive {
+            background-color: rgba(26, 0, 0, 0.8);
+            border-color: #f00;
+            color: #f00;
+            box-shadow: 0 0 25px rgba(255, 0, 0, 0.3);
+        }
+
+        /* Analysis title animation */
+        @keyframes title-appear {
+            0% { transform: translateY(-40px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+
+        /* Result container animation */
+        @keyframes result-appear {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
         }
 
         select, input, button {
@@ -153,27 +236,13 @@
             animation: shine 3s infinite;
         }
 
+        @keyframes shine {
+            0% { transform: translateX(-200%) rotate(45deg); }
+            100% { transform: translateX(200%) rotate(45deg); }
+        }
+
         .hidden {
             display: none;
-        }
-
-        .result {
-            margin-top: 5px;
-            padding: 10px;
-            border: 1px solid #600;
-            animation: text-glow 2s infinite;
-        }
-
-        .productive {
-            background-color: #001a00;
-            border-color: #0f0;
-            color: #0f0;
-        }
-
-        .not-productive {
-            background-color: #1a0000;
-            border-color: #f00;
-            color: #f00;
         }
 
         .loading {
@@ -202,29 +271,30 @@
             min-height: 220px; /* Adjusted height */
             max-height: 280px;
             transition: all 0.3s ease;
-            margin-top: 70px;
-            margin-left: 15px;
+            margin-top: 50px;
+            margin-left: -15px;
             margin-right: 15px;
         }
 
         /* Matrix rain effect container */
-        .matrix-bg {
+        canvas#matrix-rain {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            pointer-events: none;
-            opacity: 0.1;
             z-index: -1;
-            background: repeating-linear-gradient(
-                0deg,
-                rgba(0,255,0,0.15) 0%,
-                rgba(0,255,0,0) 50%,
-                rgba(0,255,0,0.15) 100%
-            );
-            background-size: 100% 50px;
-            animation: matrix-bg 1s linear infinite;
+            background-color: #000;
+        }
+
+        /* Add a glowing effect to the text over the matrix */
+        #domainSelect, #contextQuestions, #analysisResult {
+            position: relative;
+            z-index: 1;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.2);
         }
 
         /* Scanline effect */
@@ -359,7 +429,7 @@
         @media screen and (max-width: 700px) {
             html, body {
                 width: 640px;  /* Reduced from 500px */
-                height: 410px; /* Adjusted height to ensure bottom border is visible */
+                height: 380px; /* Adjusted height to ensure bottom border is visible */
             }
         }
 
@@ -429,6 +499,7 @@
             padding: 15px;
             margin-bottom: 10px;
             margin-top: 70px;
+            margin-left: -15px;
             transition: opacity 0.3s ease;
         }
 
@@ -470,13 +541,300 @@
         .scan-line-red {
             color: #ff0000;
         }
+
+        /* Restore glow effects and animations */
+        @keyframes scan-line {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        /* Enhanced animations and effects */
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+        }
+
+        @keyframes fade-in {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
+        @keyframes slide-in {
+            0% { transform: translateY(20px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+
+        h3 {
+            position: relative;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+            animation: slide-in 0.5s ease-out, pulse 2s infinite alternate;
+        }
+
+        h3::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 5%;
+            width: 90%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #0f0, transparent);
+            animation: scan-line 2s linear infinite;
+        }
+
+        .result {
+            animation: text-glow 2s infinite, fade-in 1s ease-out;
+            position: relative;
+            padding-top: 30px;
+        }
+
+        .result::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 5%;
+            width: 90%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #0f0, transparent);
+            animation: scan-line 2s linear infinite reverse;
+        }
+
+        button {
+            position: relative;
+            overflow: hidden;
+            animation: pulse 2s infinite alternate;
+        }
+
+        button::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(0,255,0,0.1), transparent);
+            transform: rotate(45deg);
+            animation: shine 3s infinite;
+        }
+
+        input, select {
+            animation: fade-in 1s ease-out;
+        }
+
+        /* Background animation */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(0, 255, 0, 0.1), transparent);
+            animation: pulse 5s infinite alternate;
+            z-index: -1;
+        }
+
+        .analysis-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 400px;
+        }
+
+        #analysisSection {
+            position: relative;
+            padding: 20px;
+            text-align: center;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            height: 100%;
+        }
+
+        #analysisBlockDuration {
+            margin-top: 30px;
+            padding: 20px;
+            border-top: 1px solid rgba(0, 255, 0, 0.3);
+        }
+
+        #analysisBlockDuration h4 {
+            color: #0f0;
+            font-size: 18px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #analysisSection h3 {
+            position: relative;
+            color: #0f0;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px #0f0;
+            font-size: 24px;
+            margin-bottom: 400px;
+            animation: title-appear 0.5s ease-out;
+            z-index: 3;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        #result {
+            position: relative;
+            padding: 20px;
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.95);
+            margin: 0 auto;
+            max-width: 80%;
+            font-family: 'Share Tech Mono', monospace;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+            border: 1px solid #0f0;
+            font-size: 16px;
+            line-height: 1.5;
+            animation: fade-in 0.5s ease-out;
+            z-index: 3;
+            margin-top: 10px;
+        }
+
+        #result .productive {
+            color: #0f0;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+        }
+
+        #result .not-productive {
+            color: #ff4444;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            text-shadow: 0 0 5px rgba(255, 68, 68, 0.5);
+        }
+
+        #result .explanation {
+            color: #88ff88;
+            margin: 15px 0;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+
+        #result .recommendations {
+            color: #66ff66;
+            margin-top: 15px;
+        }
+
+        #result .recommendations h4 {
+            color: #00ff00;
+            margin-bottom: 10px;
+            font-size: 1em;
+        }
+
+        #result .recommendations ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+
+        #result .recommendations li {
+            margin: 5px 0;
+            padding-left: 20px;
+            position: relative;
+            font-size: 0.9em;
+        }
+
+        #result .recommendations li:before {
+            content: ">";
+            position: absolute;
+            left: 0;
+            color: #00ff00;
+        }
+
+        #result .error {
+            color: #ff4444;
+            font-size: 1em;
+            padding: 10px;
+            border: 1px solid #ff4444;
+            border-radius: 5px;
+            background: rgba(255, 68, 68, 0.1);
+        }
     </style>
 </head>
 <body>
-    <canvas id="matrix-rain" class="matrix-bg"></canvas>
+    <canvas id="matrix-rain"></canvas>
 
-    <div id="domainSelect">
-        <h3>Initialize System</h3>
+    <style>
+        #blockDurationSelect {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            border: 2px solid #0f0;
+            padding: 25px 50px;
+            background: rgba(0, 10, 0, 0.7);
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+            min-width: 400px;
+        }
+
+        #blockDurationSelect h3 {
+            color: #0f0;
+            font-size: 24px;
+            margin: 0 0 25px 0;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+
+        #blockDurationSelect input,
+        #blockDurationSelect select {
+            width: 140px;
+            height: 40px;
+            background: rgba(0, 20, 0, 0.8);
+            border: 2px solid #0f0;
+            color: #0f0;
+            font-size: 20px;
+            text-align: center;
+            margin: 0 10px;
+            outline: none;
+        }
+
+        #blockDurationSelect button {
+            width: 200px;
+            height: 45px;
+            margin-top: 25px;
+            background: rgba(0, 40, 0, 0.8);
+            border: 2px solid #0f0;
+            color: #0f0;
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        #blockDurationSelect button:hover {
+            background: rgba(0, 60, 0, 0.8);
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+        }
+    </style>
+    <div id="blockDurationSelect">
+        <h3>Initialize Block Protocol</h3>
+        <div class="section-scan-line scan-line-green"></div>
+        <div style="margin: 25px 0;">
+            <input type="number" id="blockDuration" min="1" max="480" value="30">
+            <select id="durationUnit">
+                <option value="minutes">Minutes</option>
+                <option value="hours">Hours</option>
+            </select>
+        </div>
+        <button id="startBlock" type="button">Set Duration</button>
+    </div>
+
+    <div id="domainSelect" class="hidden">
+        <h3>Select Domain</h3>
         <div class="section-scan-line scan-line-green"></div>
         <select id="domain">
             <option value="">Select Domain...</option>
@@ -497,12 +855,23 @@
         <button id="nextQuestion" type="button">Process</button>
     </div>
 
-    <div id="analysisResult" class="hidden">
-        <h3>Analysis Output</h3>
-        <div class="section-scan-line scan-line-green"></div>
-        <div id="result" class="result">
-            <div class="matrix-output">
-                <div id="matrix-content">SYSTEM READY<span id="terminal-cursor"></span></div>
+    <div id="analysisSection" class="hidden" style="display: none;">
+        <div class="analysis-container">
+            <h3>ANALYSIS OUTPUT</h3>
+            <div class="section-scan-line scan-line-green"></div>
+            <div id="analysisResult" class="hidden" style="display: none;">
+                <div id="result" class="result hidden" style="display: none;"></div>
+            </div>
+            <div id="analysisBlockDuration" class="hidden" style="display: none;">
+                <h4>Set Block Duration</h4>
+                <div style="margin: 15px 0;">
+                    <input type="number" id="blockDurationAnalysis" min="1" max="480" value="30" style="width: 80px; margin-right: 10px;">
+                    <select id="durationUnitAnalysis" style="width: 100px;">
+                        <option value="minutes">Minutes</option>
+                        <option value="hours">Hours</option>
+                    </select>
+                </div>
+                <button id="startBlockAnalysis" class="block-button">START BLOCK</button>
             </div>
         </div>
     </div>
@@ -552,7 +921,6 @@
             e.preventDefault();
         });
     </script>
-
     <script src="popup.js"></script>
 </body>
 </html>

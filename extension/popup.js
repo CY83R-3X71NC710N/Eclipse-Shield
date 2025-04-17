@@ -1,326 +1,313 @@
-let context = {};
-let currentDomain = '';
-let blockDuration = 0;
-const API_BASE_URL = 'http://localhost:5000';
+document.addEventListener('DOMContentLoaded', () => {
+    // Chrome Storage wrapper for iframe
+    const chromeStorage = {
+        get: function(keys) {
+            return new Promise((resolve) => {
+                const channel = new MessageChannel();
+                channel.port1.onmessage = (event) => {
+                    resolve(event.data.result);
+                };
+                window.parent.postMessage({
+                    type: 'storage-get',
+                    keys: keys
+                }, '*', [channel.port2]);
+            });
+        },
+        set: function(items) {
+            return new Promise((resolve) => {
+                const channel = new MessageChannel();
+                channel.port1.onmessage = () => resolve();
+                window.parent.postMessage({
+                    type: 'storage-set',
+                    items: items
+                }, '*', [channel.port2]);
+            });
+        }
+    };
 
-// Add session check at start
-async function checkBlockStatus() {
-    const { blockData } = await chrome.storage.local.get('blockData');
-    if (blockData?.endTime && Date.now() < blockData.endTime) {
-        document.getElementById('domainSelect').classList.add('hidden');
-        document.getElementById('analysisResult').classList.remove('hidden');
-        const resultDiv = document.getElementById('result');
-        resultDiv.textContent = 'Block active - Please wait for the current block to end';
-        resultDiv.className = 'result not-productive';
+    // Initialize storage state
+    let storageState = {
+        sessionDuration: null,
+        domain: null,
+        context: [],
+        sessionData: null
+    };
+
+    // Initialize by checking storage
+    chromeStorage.get(null).then(data => {
+        console.log('Initial storage state:', data);
+    }).catch(err => {
+        console.error('Storage access error:', err);
+    });
+
+    // Matrix animation code
+    let canvas = null;
+    let ctx = null;
+    let drops = [];
+    const fontSize = 14;
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()';
+
+    function initCanvas() {
+        canvas = document.getElementById('matrix-rain');
+        if (!canvas) {
+            console.error('Matrix canvas not found!');
+            return false;
+        }
+
+        ctx = canvas.getContext('2d');
+        if (!ctx) {
+            console.error('Could not get canvas context!');
+            return false;
+        }
+
         return true;
     }
-    return false;
-}
 
-// Modify fetchAPI to remove Chrome extension API dependency
-async function fetchAPI(endpoint, data) {
-    try {
-        console.log('Fetching:', endpoint, 'with data:', data);
-        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            mode: 'cors',
-            body: JSON.stringify(data)
-        });
+    function resizeCanvas() {
+        if (!canvas || !ctx) return;
 
-        console.log('Response:', response);
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('API Error:', {
-                status: response.status,
-                statusText: response.statusText,
-                error: errorText
-            });
-            throw new Error(`Server error (${response.status}): ${errorText}`);
+        // Initialize drops
+        drops.length = 0;
+        const columns = Math.ceil(canvas.width / fontSize);
+        for (let i = 0; i < columns; i++) {
+            drops[i] = Math.random() * -100;
         }
-
-        const responseData = await response.json();
-        console.log('Response data:', responseData);
-        return responseData;
-
-    } catch (error) {
-        console.error('Fetch error:', error);
-        throw error;
     }
-}
 
-// Add this right after your fetchAPI function to debug click events
-function debugClick(e) {
-    console.log('Button clicked:', e);
-}
+    function drawMatrix() {
+        if (!canvas || !ctx) return;
 
-function showLoading(show) {
-    document.getElementById('loadingIndicator').classList.toggle('hidden', !show);
-}
+        // Semi-transparent fade effect
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-// Update showError to create errorDisplay if it doesn't exist
-function showError(message) {
-    console.error('Error:', message);
-    let errorDiv = document.getElementById('errorDisplay');
-    if (!errorDiv) {
-        errorDiv = document.createElement('div');
-        errorDiv.id = 'errorDisplay';
-        errorDiv.className = 'error hidden';
-        document.body.appendChild(errorDiv);
-    }
-    errorDiv.textContent = message;
-    errorDiv.classList.remove('hidden');
-    setTimeout(() => errorDiv.classList.add('hidden'), 5000);
-}
+        // Set text properties
+        ctx.font = fontSize + 'px monospace';
 
-// Add these functions at the top
-const matrixChars = '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンガギグゲゴザジズゼゾダヂヅデド';
-let matrixInterval;
+        // Draw characters
+        for (let i = 0; i < drops.length; i++) {
+            // Get random character
+            const char = characters[Math.floor(Math.random() * characters.length)];
+            const x = i * fontSize;
+            const y = drops[i] * fontSize;
 
-function createMatrixEffect() {
-    const content = document.getElementById('matrix-content');
-    let text = '';
-    for (let i = 0; i < 50; i++) {
-        text += `<span class="matrix-char" style="animation-delay: ${Math.random() * 2}s">
-            ${matrixChars[Math.floor(Math.random() * matrixChars.length)]}
-        </span>`;
-    }
-    content.innerHTML = text + '<span id="terminal-cursor"></span>';
-}
-
-function startMatrixAnimation() {
-    clearInterval(matrixInterval);
-    matrixInterval = setInterval(createMatrixEffect, 100);
-}
-
-function stopMatrixAnimation() {
-    clearInterval(matrixInterval);
-}
-
-// Modify the initialization function
-async function initializeSession() {
-    try {
-        console.log('Starting initialization');
-        const domain = document.getElementById('domain').value;
-        console.log('Selected domain:', domain);
-
-        if (!domain) {
-            showError("Please select a domain");
-            return;
-        }
-
-        showLoading(true);
-        console.log('Fetching first question...');
-        
-        const response = await fetchAPI('/get_question', {
-            domain: domain,
-            context: {}
-        });
-
-        console.log('API response:', response);
-
-        // Store current domain and reset context
-        currentDomain = domain;
-        context = {};
-
-        // Show first question
-        const questionElement = document.getElementById('question');
-        if (questionElement) {
-            questionElement.textContent = response.question;
-            document.getElementById('domainSelect').classList.add('hidden');
-            document.getElementById('contextQuestions').classList.remove('hidden');
-            document.getElementById('answer').value = '';
-            document.getElementById('answer').focus();
-        } else {
-            throw new Error('Question element not found');
-        }
-
-    } catch (error) {
-        console.error('Initialization error:', error);
-        showError(error.message || 'Error initializing session');
-    } finally {
-        showLoading(false);
-    }
-}
-
-document.getElementById('startContext').addEventListener('click', initializeSession);
-
-document.getElementById('nextQuestion').addEventListener('click', async () => {
-    const answer = document.getElementById('answer').value;
-    if (!answer.trim()) return;
-
-    const question = document.getElementById('question').textContent;
-    context[question] = answer;
-    document.getElementById('answer').value = '';
-    
-    await getNextQuestion();
-});
-
-async function getNextQuestion() {
-    try {
-        showLoading(true);
-        const data = await fetchAPI('/get_question', {
-            domain: currentDomain,
-            context: context
-        });
-        
-        if (data.error) {
-            throw new Error(data.error);
-        }
-        
-        if (data.done) {
-            await sendContext();
-            return;
-        }
-        
-        document.getElementById('question').textContent = data.question;
-        
-    } catch (error) {
-        console.error('Error:', error);
-        showError(error.message);
-    } finally {
-        showLoading(false);
-    }
-}
-
-async function sendContext() {
-    try {
-        showLoading(true);
-        await fetchAPI('/contextualize', {
-            domain: currentDomain, 
-            context: context 
-        });
-        
-        await analyzeCurrentTab();
-    } catch (error) {
-        console.error('Error:', error);
-        showError(error.message);
-    } finally {
-        showLoading(false);
-    }
-}
-
-// Modify the analyzeCurrentTab function
-async function analyzeCurrentTab() {
-    try {
-        showLoading(true);
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        
-        // Allow extension pages
-        if (tab.url.startsWith('chrome-extension://') || tab.url.startsWith('chrome://')) {
-            document.getElementById('contextQuestions').classList.add('hidden');
-            document.getElementById('analysisResult').classList.remove('hidden');
-            startMatrixAnimation();
-            return;
-        }
-
-        const data = await fetchAPI('/analyze', {
-            url: tab.url,
-            domain: currentDomain
-        });
-        
-        if (!data.isProductive) {
-            const endTime = Date.now() + blockDuration;
-            console.log('Setting block for:', tab.url);
-            
-            await chrome.runtime.sendMessage({
-                type: 'setBlock',
-                data: {
-                    url: tab.url,
-                    endTime: endTime
+            // Draw bright head
+            if (drops[i] * fontSize < canvas.height && drops[i] > 0) {
+                if (Math.random() > 0.98) {
+                    ctx.fillStyle = '#FFF';
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = '#0F0';
+                } else {
+                    ctx.fillStyle = '#0F0';
+                    ctx.shadowBlur = 0;
                 }
-            });
+
+                ctx.fillText(char, x, y);
+            }
+
+            // Move drop
+            drops[i] += 0.5;
+
+            // Reset drop when it goes off screen
+            if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                drops[i] = 0;
+            }
         }
-        
-        document.getElementById('contextQuestions').classList.add('hidden');
-        document.getElementById('analysisResult').classList.remove('hidden');
-        
-        const resultDiv = document.getElementById('result');
-        if (data.isProductive) {
-            resultDiv.innerHTML = '<div class="matrix-output">ACCESS GRANTED: Site is productive!<span id="terminal-cursor"></span></div>';
-            resultDiv.className = 'result productive';
-        } else {
-            resultDiv.innerHTML = '<div class="matrix-output">ACCESS DENIED: Site has been blocked.<span id="terminal-cursor"></span></div>';
-            resultDiv.className = 'result not-productive';
-        }
-        
-    } catch (error) {
-        console.error('Error:', error);
-        showError(error.message);
-        startMatrixAnimation();
-    } finally {
-        showLoading(false);
+
+        // Continue animation
+        requestAnimationFrame(drawMatrix);
     }
-}
 
-// Add cleanup on popup close
-window.addEventListener('unload', () => {
-    stopMatrixAnimation();
-});
+    function startMatrixAnimation() {
+        if (!canvas || !ctx) {
+            if (!initCanvas()) return;
+        }
 
-// Remove the duplicate DOMContentLoaded event listener and merge the functionality
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log('DOM loaded');
+        resizeCanvas();
+        drawMatrix();
+    }
+
+    // Add window resize handler
+    window.addEventListener('resize', resizeCanvas);
+
+    // Start matrix animation
+    startMatrixAnimation();
+
+    // Existing popup code
+    const blockDurationSelect = document.getElementById('blockDurationSelect');
+    const domainSelect = document.getElementById('domainSelect');
+    const contextQuestions = document.getElementById('contextQuestions');
+    const analysisSection = document.getElementById('analysisSection');
     
-    const startButton = document.getElementById('startContext');
-    if (startButton) {
-        console.log('Found start button');
-        // Remove old listeners first
-        const newButton = startButton.cloneNode(true);
-        startButton.parentNode.replaceChild(newButton, startButton);
+    let currentContext = [];
+    
+    // Initialize block duration selection with storage
+    document.getElementById('startBlock').addEventListener('click', () => {
+        const duration = parseInt(document.getElementById('blockDuration').value);
+        const unit = document.getElementById('durationUnit').value;
+        const durationMs = unit === 'hours' ? duration * 60 * 60 * 1000 : duration * 60 * 1000;
         
-        newButton.addEventListener('click', (e) => {
-            console.log('Execute button clicked');
-            debugClick(e);
-            initializeSession();
+        storageState.sessionDuration = durationMs;
+        
+        // Store session duration
+        chromeStorage.set({
+            sessionDuration: durationMs
+        }).then(() => {
+            console.log('Stored session duration:', durationMs);
+            blockDurationSelect.classList.add('hidden');
+            domainSelect.classList.remove('hidden');
         });
-    }
-
-    const { blockData, sessionData } = await chrome.storage.local.get(['blockData', 'sessionData']);
-    const answer = document.getElementById('answer');
+    });
     
-    // Check for existing block
-    if (blockData?.endTime && Date.now() < blockData.endTime) {
-        document.getElementById('domainSelect').classList.add('hidden');
-        document.getElementById('analysisResult').classList.remove('hidden');
-        const resultDiv = document.getElementById('result');
-        resultDiv.textContent = `Block active for ${sessionData?.domain || 'current task'} - ${Math.round((blockData.endTime - Date.now()) / 60000)} minutes remaining`;
-        resultDiv.className = 'result not-productive';
-        return;
-    }
-
-    // Add event listeners
-    document.getElementById('startContext').addEventListener('click', initializeSession);
-    document.getElementById('nextQuestion').addEventListener('click', handleNextQuestion);
+    // Handle domain selection with storage
+    document.getElementById('startContext').addEventListener('click', async () => {
+        const domain = document.getElementById('domain').value;
+        if (!domain) return;
+        
+        storageState.domain = domain;
+        
+        // Store domain
+        await chromeStorage.set({
+            domain: domain
+        });
+        console.log('Stored domain:', domain);
+        
+        domainSelect.classList.add('hidden');
+        contextQuestions.classList.remove('hidden');
+        
+        await getNextQuestion(domain);
+    });
     
-    // Handle Enter key in answer input
-    answer.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            document.getElementById('nextQuestion').click();
+    // Handle question responses with storage
+    document.getElementById('nextQuestion').addEventListener('click', async () => {
+        const answer = document.getElementById('answer').value;
+        if (!answer) return;
+        
+        const question = document.getElementById('question').textContent;
+        currentContext.push({ question, answer });
+        
+        // Update context in storage
+        storageState.context = currentContext;
+        await chromeStorage.set({
+            context: currentContext
+        });
+        console.log('Stored updated context:', currentContext);
+        
+        const domain = document.getElementById('domain').value;
+        const response = await fetch('http://localhost:5000/get_question', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                domain: domain,
+                context: currentContext
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.question === 'DONE') {
+            startAnalysis();
+        } else {
+            document.getElementById('question').textContent = data.question;
+            document.getElementById('answer').value = '';
         }
     });
+    
+    async function getNextQuestion(domain) {
+        const response = await fetch('http://localhost:5000/get_question', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                domain: domain,
+                context: currentContext
+            })
+        });
+        
+        const data = await response.json();
+        document.getElementById('question').textContent = data.question;
+    }
+    
+    async function startAnalysis() {
+        try {
+            contextQuestions.classList.add('hidden');
+            analysisSection.classList.remove('hidden');
+            analysisSection.style.display = 'block';
+            
+            // Get all stored data
+            const sessionDuration = await chromeStorage.get('sessionDuration');
+            const domain = storageState.domain;
+            const context = storageState.context;
+            
+            // Create session data
+            const sessionData = {
+                state: 'active',
+                startTime: Date.now(),
+                endTime: Date.now() + sessionDuration.sessionDuration,
+                domain: domain
+            };
+            
+            // Store complete session state
+            await chromeStorage.set({
+                sessionData: sessionData,
+                domain: domain,
+                context: context
+            });
+            
+            console.log('Stored complete session state:', {
+                sessionData,
+                domain,
+                context
+            });
 
-    // Handle Enter key on domain select
-    document.getElementById('domain').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            initializeSession();
+            // Send message to parent
+            const channel = new MessageChannel();
+            channel.port1.onmessage = (event) => {
+                if (event.data.success) {
+                    document.getElementById('result').classList.remove('hidden');
+                    document.getElementById('result').style.display = 'block';
+                    document.getElementById('result').innerHTML = 
+                        'Session started. Websites will now be analyzed based on your task context.';
+                } else {
+                    document.getElementById('result').innerHTML = 
+                        'Failed to start session. Please try again.';
+                }
+            };
+
+            window.parent.postMessage({
+                type: 'START_SESSION',
+                duration: sessionDuration.sessionDuration,
+                domain: domain,
+                context: context
+            }, '*', [channel.port2]);
+
+        } catch (error) {
+            console.error('Error in startAnalysis:', error);
+            document.getElementById('result').innerHTML = 
+                'An unexpected error occurred. Please try again.';
         }
+    }
+    
+    // Handle analysis duration setting
+    document.getElementById('startBlockAnalysis').addEventListener('click', () => {
+        const duration = parseInt(document.getElementById('blockDurationAnalysis').value);
+        const unit = document.getElementById('durationUnitAnalysis').value;
+        
+        const durationMs = unit === 'hours' ? 
+            duration * 60 * 60 * 1000 : 
+            duration * 60 * 1000;
+        
+        // Update session duration
+        chrome.storage.local.get(['sessionData'], (data) => {
+            if (data.sessionData) {
+                const sessionData = {
+                    ...data.sessionData,
+                    endTime: Date.now() + durationMs
+                };
+                chrome.storage.local.set({ sessionData });
+            }
+        });
     });
 });
-
-// Add this new function to handle next question clicks
-async function handleNextQuestion() {
-    const answer = document.getElementById('answer').value.trim();
-    if (!answer) return;
-
-    const question = document.getElementById('question').textContent;
-    context[question] = answer;
-    document.getElementById('answer').value = '';
-    
-    await getNextQuestion();
-}
