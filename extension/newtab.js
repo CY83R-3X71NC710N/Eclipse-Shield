@@ -4,6 +4,56 @@ let mouseVelocity = { x: 0, y: 0 };
 let lastMousePosition = { x: 0, y: 0 };
 let globalSearchBox = null; // Add global reference
 
+// Add state management for input persistence
+const searchBoxState = {
+    value: '',
+    placeholder: '',
+    placeholderIndex: 0,
+    isTyping: false,
+    isFocused: false,
+    save: function() {
+        if (!globalSearchBox) return;
+        this.value = globalSearchBox.value || '';
+        this.placeholder = globalSearchBox.placeholder || '';
+        
+        chrome.storage.local.set({
+            searchBoxState: {
+                value: this.value,
+                placeholder: this.placeholder,
+                placeholderIndex: placeholderIndex,
+                isTyping: isTyping || false,
+                isFocused: document.activeElement === globalSearchBox
+            }
+        }, () => {
+            console.log('Saved search box state:', this);
+        });
+    },
+    restore: function() {
+        chrome.storage.local.get(['searchBoxState'], (data) => {
+            if (data.searchBoxState) {
+                console.log('Restoring search box state:', data.searchBoxState);
+                
+                if (globalSearchBox) {
+                    globalSearchBox.value = data.searchBoxState.value || '';
+                    globalSearchBox.placeholder = data.searchBoxState.placeholder || '';
+                    
+                    if (data.searchBoxState.placeholderIndex !== undefined) {
+                        placeholderIndex = data.searchBoxState.placeholderIndex;
+                    }
+                    
+                    if (data.searchBoxState.isTyping) {
+                        globalSearchBox.classList.add('typing');
+                    }
+                    
+                    if (data.searchBoxState.isFocused) {
+                        setTimeout(() => globalSearchBox.focus(), 100);
+                    }
+                }
+            }
+        });
+    }
+};
+
 // Matrix animation setup
 const canvas = document.getElementById('matrixCanvas');
 const ctx = canvas.getContext('2d');
@@ -251,8 +301,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 miniRipple.style.transform = 'translate(-50%, -50%)';
                 document.body.appendChild(miniRipple);
                 
-                miniRipple.addEventListener('animationend', () => {
-                    miniRipple.remove();
+                miniRipple.addEventListener('animationend', () => miniRipple.remove();
                 });
             }, i * 100);
         }

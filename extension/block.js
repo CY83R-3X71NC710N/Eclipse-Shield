@@ -25,6 +25,68 @@ let isAnalyzing = false;
 let hasRedirected = false;
 let globalRedirectFlag = false;
 
+// Add state persistence object
+const blockPageState = {
+    reason: '',
+    url: '',
+    originalUrl: '',
+    domain: '',
+    explanation: '',
+    blockedUrl: '',
+    errorMessage: '',
+    currentSection: 'no-session',
+    
+    // Save current state to chrome storage
+    save: function() {
+        chrome.storage.local.set({
+            blockPageState: {
+                reason: this.reason,
+                url: this.url,
+                originalUrl: this.originalUrl,
+                domain: this.domain,
+                explanation: this.explanation,
+                blockedUrl: this.blockedUrl,
+                errorMessage: this.errorMessage,
+                currentSection: this.currentSection
+            }
+        }, () => {
+            console.log('Block page state saved');
+        });
+    },
+    
+    // Restore state from chrome storage
+    restore: function() {
+        chrome.storage.local.get(['blockPageState'], (data) => {
+            if (data.blockPageState) {
+                console.log('Restoring block page state:', data.blockPageState);
+                
+                this.reason = data.blockPageState.reason || '';
+                this.url = data.blockPageState.url || '';
+                this.originalUrl = data.blockPageState.originalUrl || '';
+                this.domain = data.blockPageState.domain || '';
+                this.explanation = data.blockPageState.explanation || '';
+                this.blockedUrl = data.blockPageState.blockedUrl || '';
+                this.errorMessage = data.blockPageState.errorMessage || '';
+                this.currentSection = data.blockPageState.currentSection || 'no-session';
+                
+                // Apply restored state to UI
+                if (this.blockedUrl) {
+                    document.getElementById('blockedUrl').textContent = this.blockedUrl;
+                }
+                if (this.explanation) {
+                    document.getElementById('explanation').textContent = this.explanation;
+                }
+                if (this.errorMessage) {
+                    document.getElementById('errorMessage').textContent = this.errorMessage;
+                }
+                
+                // Show the correct section
+                showSection(this.currentSection);
+            }
+        });
+    }
+};
+
 document.addEventListener('DOMContentLoaded', async () => {
     const params = new URLSearchParams(window.location.search);
     const reason = params.get('reason') || 'no-session';
@@ -35,6 +97,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Skip if already redirecting
     if (globalRedirectFlag) return;
+
+    // Update state object with URL parameters
+    blockPageState.reason = reason;
+    blockPageState.url = url;
+    blockPageState.originalUrl = originalUrl;
+    blockPageState.domain = domain;
+    blockPageState.explanation = explanation;
+    
+    // First try to restore any previous state
+    await new Promise(resolve => {
+        chrome.storage.local.get(['blockPageState'], (data) => {
+            if (data.blockPageState && 
+                data.blockPageState.url === url && 
+                data.blockPageState.reason === reason) {
+                // Only restore if it's the same URL and reason
+                blockPageState.restore();
+                resolve();
+            } else {
+                // Otherwise process as new
+                resolve();
+            }
+        });
+    });
 
     // Get session data with context
     const { sessionData } = await chrome.storage.local.get('sessionData');

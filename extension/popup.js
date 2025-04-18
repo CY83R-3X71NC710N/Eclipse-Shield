@@ -30,15 +30,88 @@ document.addEventListener('DOMContentLoaded', () => {
         sessionDuration: null,
         domain: null,
         context: [],
-        sessionData: null
+        sessionData: null,
+        blockDuration: null,
+        durationUnit: 'minutes',
+        domainSelection: '',
+        currentQuestion: '',
+        currentAnswer: '',
+        activeSection: 'blockDurationSelect'
     };
 
     // Initialize by checking storage
-    chromeStorage.get(null).then(data => {
-        console.log('Initial storage state:', data);
+    chromeStorage.get(['formState']).then(data => {
+        console.log('Initial storage and form state:', data);
+        if (data.formState) {
+            storageState = {...storageState, ...data.formState};
+            restoreFormState();
+        }
     }).catch(err => {
         console.error('Storage access error:', err);
     });
+
+    // Save form state after any change
+    function saveFormState() {
+        storageState.blockDuration = document.getElementById('blockDuration').value;
+        storageState.durationUnit = document.getElementById('durationUnit').value;
+        storageState.domainSelection = document.getElementById('domain').value;
+        storageState.currentAnswer = document.getElementById('answer').value;
+
+        if (!document.getElementById('blockDurationSelect').classList.contains('hidden')) {
+            storageState.activeSection = 'blockDurationSelect';
+        } else if (!document.getElementById('domainSelect').classList.contains('hidden')) {
+            storageState.activeSection = 'domainSelect';
+        } else if (!document.getElementById('contextQuestions').classList.contains('hidden')) {
+            storageState.activeSection = 'contextQuestions';
+        } else if (!document.getElementById('analysisSection').classList.contains('hidden')) {
+            storageState.activeSection = 'analysisSection';
+        }
+
+        chromeStorage.set({
+            formState: storageState
+        }).then(() => {
+            console.log('Form state saved:', storageState);
+        });
+    }
+
+    // Restore form state from storage
+    function restoreFormState() {
+        console.log('Restoring form state:', storageState);
+
+        if (storageState.blockDuration) {
+            document.getElementById('blockDuration').value = storageState.blockDuration;
+        }
+        if (storageState.durationUnit) {
+            document.getElementById('durationUnit').value = storageState.durationUnit;
+        }
+        if (storageState.domainSelection) {
+            document.getElementById('domain').value = storageState.domainSelection;
+        }
+        if (storageState.currentAnswer) {
+            document.getElementById('answer').value = storageState.currentAnswer;
+        }
+        if (storageState.currentQuestion) {
+            document.getElementById('question').textContent = storageState.currentQuestion;
+        }
+
+        const sections = ['blockDurationSelect', 'domainSelect', 'contextQuestions', 'analysisSection'];
+        sections.forEach(section => {
+            const element = document.getElementById(section);
+            if (element) {
+                if (section === storageState.activeSection) {
+                    element.classList.remove('hidden');
+                    if (section === 'analysisSection') {
+                        element.style.display = 'block';
+                    }
+                } else {
+                    element.classList.add('hidden');
+                    if (section === 'analysisSection') {
+                        element.style.display = 'none';
+                    }
+                }
+            }
+        });
+    }
 
     // Matrix animation code
     let canvas = null;
@@ -69,7 +142,6 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
-        // Initialize drops
         drops.length = 0;
         const columns = Math.ceil(canvas.width / fontSize);
         for (let i = 0; i < columns; i++) {
@@ -80,21 +152,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function drawMatrix() {
         if (!canvas || !ctx) return;
 
-        // Semi-transparent fade effect
         ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Set text properties
         ctx.font = fontSize + 'px monospace';
 
-        // Draw characters
         for (let i = 0; i < drops.length; i++) {
-            // Get random character
             const char = characters[Math.floor(Math.random() * characters.length)];
             const x = i * fontSize;
             const y = drops[i] * fontSize;
 
-            // Draw bright head
             if (drops[i] * fontSize < canvas.height && drops[i] > 0) {
                 if (Math.random() > 0.98) {
                     ctx.fillStyle = '#FFF';
@@ -108,16 +175,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.fillText(char, x, y);
             }
 
-            // Move drop
             drops[i] += 0.5;
 
-            // Reset drop when it goes off screen
             if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
                 drops[i] = 0;
             }
         }
 
-        // Continue animation
         requestAnimationFrame(drawMatrix);
     }
 
@@ -130,13 +194,10 @@ document.addEventListener('DOMContentLoaded', () => {
         drawMatrix();
     }
 
-    // Add window resize handler
     window.addEventListener('resize', resizeCanvas);
 
-    // Start matrix animation
     startMatrixAnimation();
 
-    // Existing popup code
     const blockDurationSelect = document.getElementById('blockDurationSelect');
     const domainSelect = document.getElementById('domainSelect');
     const contextQuestions = document.getElementById('contextQuestions');
@@ -144,7 +205,11 @@ document.addEventListener('DOMContentLoaded', () => {
     
     let currentContext = [];
     
-    // Initialize block duration selection with storage
+    document.getElementById('blockDuration').addEventListener('input', saveFormState);
+    document.getElementById('durationUnit').addEventListener('change', saveFormState);
+    document.getElementById('domain').addEventListener('change', saveFormState);
+    document.getElementById('answer').addEventListener('input', saveFormState);
+
     document.getElementById('startBlock').addEventListener('click', () => {
         const duration = parseInt(document.getElementById('blockDuration').value);
         const unit = document.getElementById('durationUnit').value;
@@ -152,24 +217,23 @@ document.addEventListener('DOMContentLoaded', () => {
         
         storageState.sessionDuration = durationMs;
         
-        // Store session duration
         chromeStorage.set({
             sessionDuration: durationMs
         }).then(() => {
             console.log('Stored session duration:', durationMs);
             blockDurationSelect.classList.add('hidden');
             domainSelect.classList.remove('hidden');
+            storageState.activeSection = 'domainSelect';
+            saveFormState();
         });
     });
     
-    // Handle domain selection with storage
     document.getElementById('startContext').addEventListener('click', async () => {
         const domain = document.getElementById('domain').value;
         if (!domain) return;
         
         storageState.domain = domain;
         
-        // Store domain
         await chromeStorage.set({
             domain: domain
         });
@@ -177,11 +241,12 @@ document.addEventListener('DOMContentLoaded', () => {
         
         domainSelect.classList.add('hidden');
         contextQuestions.classList.remove('hidden');
+        storageState.activeSection = 'contextQuestions';
+        saveFormState();
         
         await getNextQuestion(domain);
     });
     
-    // Handle question responses with storage
     document.getElementById('nextQuestion').addEventListener('click', async () => {
         const answer = document.getElementById('answer').value;
         if (!answer) return;
@@ -189,7 +254,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const question = document.getElementById('question').textContent;
         currentContext.push({ question, answer });
         
-        // Update context in storage
         storageState.context = currentContext;
         await chromeStorage.set({
             context: currentContext
@@ -212,7 +276,10 @@ document.addEventListener('DOMContentLoaded', () => {
             startAnalysis();
         } else {
             document.getElementById('question').textContent = data.question;
+            storageState.currentQuestion = data.question;
             document.getElementById('answer').value = '';
+            storageState.currentAnswer = '';
+            saveFormState();
         }
     });
     
@@ -228,6 +295,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const data = await response.json();
         document.getElementById('question').textContent = data.question;
+        storageState.currentQuestion = data.question;
+        saveFormState();
     }
     
     async function startAnalysis() {
@@ -235,13 +304,13 @@ document.addEventListener('DOMContentLoaded', () => {
             contextQuestions.classList.add('hidden');
             analysisSection.classList.remove('hidden');
             analysisSection.style.display = 'block';
+            storageState.activeSection = 'analysisSection';
+            saveFormState();
             
-            // Get all stored data
             const sessionDuration = await chromeStorage.get('sessionDuration');
             const domain = storageState.domain;
             const context = storageState.context;
             
-            // Create session data
             const sessionData = {
                 state: 'active',
                 startTime: Date.now(),
@@ -249,7 +318,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 domain: domain
             };
             
-            // Store complete session state
             await chromeStorage.set({
                 sessionData: sessionData,
                 domain: domain,
@@ -262,7 +330,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 context
             });
 
-            // Send message to parent
             const channel = new MessageChannel();
             channel.port1.onmessage = (event) => {
                 if (event.data.success) {
@@ -274,6 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.getElementById('result').innerHTML = 
                         'Failed to start session. Please try again.';
                 }
+                saveFormState();
             };
 
             window.parent.postMessage({
@@ -287,10 +355,10 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error in startAnalysis:', error);
             document.getElementById('result').innerHTML = 
                 'An unexpected error occurred. Please try again.';
+            saveFormState();
         }
     }
     
-    // Handle analysis duration setting
     document.getElementById('startBlockAnalysis').addEventListener('click', () => {
         const duration = parseInt(document.getElementById('blockDurationAnalysis').value);
         const unit = document.getElementById('durationUnitAnalysis').value;
@@ -299,7 +367,6 @@ document.addEventListener('DOMContentLoaded', () => {
             duration * 60 * 60 * 1000 : 
             duration * 60 * 1000;
         
-        // Update session duration
         chrome.storage.local.get(['sessionData'], (data) => {
             if (data.sessionData) {
                 const sessionData = {
@@ -307,6 +374,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     endTime: Date.now() + durationMs
                 };
                 chrome.storage.local.set({ sessionData });
+                saveFormState();
             }
         });
     });
