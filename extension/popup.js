@@ -83,92 +83,92 @@ document.addEventListener('DOMContentLoaded', () => {
         const analysisSection = document.getElementById('analysisSection');
         if (!analysisSection) return;
         
-        // Ensure the section is visible
-        analysisSection.classList.remove('hidden');
-        analysisSection.style.display = 'block';
-        
-        // Ensure the analysis result container is visible
-        const analysisResultDiv = document.getElementById('analysisResult');
-        if (analysisResultDiv) {
-            analysisResultDiv.classList.remove('hidden');
-            analysisResultDiv.style.display = 'block';
-        }
-        
-        const resultDiv = document.getElementById('result');
-        if (!resultDiv) return;
-        
-        // Ensure the result div is visible
-        resultDiv.classList.remove('hidden');
-        resultDiv.style.display = 'block';
-        
-        const stats = storageState.analysisStatus;
-        
-        // Create the analysis display
-        let statusHtml = `
-            <div class="analysis-stats">
-                <h4>SESSION STATISTICS</h4>
-                <div class="stat-item">
-                    <span class="stat-label">Sites Analyzed</span>
-                    <span class="stat-value">${stats.totalSites}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Sites Allowed</span>
-                    <span class="stat-value allowed">${stats.allowedSites}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Sites Blocked</span>
-                    <span class="stat-value blocked">${stats.blockedSites}</span>
-                </div>
-            </div>`;
+        // Only make visible if it's the active section
+        if (storageState.activeSection === 'analysisSection') {
+            analysisSection.classList.remove('hidden');
+            analysisSection.style.display = 'block';
             
-        // Add latest activity if available
-        if (stats.lastUrl) {
-            const actionClass = stats.lastAction === 'blocked' ? 'blocked' : 'allowed';
-            statusHtml += `
-                <div class="latest-activity">
-                    <h4>LATEST ACTIVITY</h4>
-                    <div class="activity-item ${actionClass}">
-                        <div class="activity-url">${stats.lastUrl}</div>
-                        <div class="activity-status ${actionClass}">${stats.lastAction.toUpperCase()}</div>
-                        ${stats.lastReason ? `<div class="activity-reason">${stats.lastReason}</div>` : ''}
+            const analysisResultDiv = document.getElementById('analysisResult');
+            if (analysisResultDiv) {
+                analysisResultDiv.classList.remove('hidden');
+                analysisResultDiv.style.display = 'block';
+            }
+            
+            const resultDiv = document.getElementById('result');
+            if (!resultDiv) return;
+            
+            resultDiv.classList.remove('hidden');
+            resultDiv.style.display = 'block';
+            
+            const stats = storageState.analysisStatus;
+            
+            // Create the analysis display
+            let statusHtml = `
+                <div class="analysis-stats">
+                    <h4>SESSION STATISTICS</h4>
+                    <div class="stat-item">
+                        <span class="stat-label">Sites Analyzed</span>
+                        <span class="stat-value">${stats.totalSites}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Sites Allowed</span>
+                        <span class="stat-value allowed">${stats.allowedSites}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Sites Blocked</span>
+                        <span class="stat-value blocked">${stats.blockedSites}</span>
                     </div>
                 </div>`;
-        } else {
-            statusHtml += `
-                <div class="latest-activity">
-                    <h4>LATEST ACTIVITY</h4>
-                    <div class="activity-item neutral">
-                        <div class="activity-status">No sites visited yet</div>
-                        <div class="activity-info">Your browsing statistics will appear here</div>
-                    </div>
-                </div>`;
-        }
-        
-        // Add session info
-        chromeStorage.get(['sessionData', 'domain']).then(sessionData => {
-            if (sessionData.sessionData) {
-                const timeLeft = sessionData.sessionData.endTime - Date.now();
-                const hours = Math.floor(timeLeft / (60 * 60 * 1000));
-                const minutes = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000));
-                const seconds = Math.floor((timeLeft % (60 * 1000)) / 1000);
                 
+            // Add latest activity if available
+            if (stats.lastUrl) {
+                const actionClass = stats.lastAction === 'blocked' ? 'blocked' : 'allowed';
                 statusHtml += `
-                    <div class="session-info">
-                        <h4>SESSION INFO</h4>
-                        <div class="session-item">
-                            <span class="session-label">Domain</span>
-                            <span class="session-value domain">${sessionData.domain || 'Not set'}</span>
+                    <div class="latest-activity">
+                        <h4>LATEST ACTIVITY</h4>
+                        <div class="activity-item ${actionClass}">
+                            <div class="activity-url">${stats.lastUrl}</div>
+                            <div class="activity-status ${actionClass}">${stats.lastAction.toUpperCase()}</div>
+                            ${stats.lastReason ? `<div class="activity-reason">${stats.lastReason}</div>` : ''}
                         </div>
-                        <div class="session-item">
-                            <span class="session-label">Time Remaining</span>
-                            <span class="session-value time">${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}</span>
+                    </div>`;
+            } else {
+                statusHtml += `
+                    <div class="latest-activity">
+                        <h4>LATEST ACTIVITY</h4>
+                        <div class="activity-item neutral">
+                            <div class="activity-status">No sites visited yet</div>
+                            <div class="activity-info">Your browsing statistics will appear here</div>
                         </div>
                     </div>`;
             }
             
-            console.log('Setting result HTML content', statusHtml);
-            resultDiv.innerHTML = statusHtml;
-        });
+            // Add session info
+            chromeStorage.get(['sessionData', 'domain']).then(sessionData => {
+                if (sessionData.sessionData) {
+                    const timeLeft = sessionData.sessionData.endTime - Date.now();
+                    const hours = Math.floor(timeLeft / (60 * 60 * 1000));
+                    const minutes = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000));
+                    const seconds = Math.floor((timeLeft % (60 * 1000)) / 1000);
+                    
+                    statusHtml += `
+                        <div class="session-info">
+                            <h4>SESSION INFO</h4>
+                            <div class="session-item">
+                                <span class="session-label">Domain</span>
+                                <span class="session-value domain">${sessionData.domain || 'Not set'}</span>
+                            </div>
+                            <div class="session-item">
+                                <span class="session-label">Time Remaining</span>
+                                <span class="session-value time">${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}</span>
+                            </div>
+                        </div>`;
+                }
+                
+                console.log('Setting result HTML content', statusHtml);
+                resultDiv.innerHTML = statusHtml;
+            });
+        }
     }
 
     // Save form state after any change
@@ -593,23 +593,10 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Set up interval to refresh analysis UI
     setInterval(() => {
-        if (document.getElementById('analysisSection').style.display !== 'none') {
+        if (storageState.activeSection === 'analysisSection' && 
+            document.getElementById('analysisSection') && 
+            !document.getElementById('analysisSection').classList.contains('hidden')) {
             updateAnalysisUI();
         }
-    }, 1000);
-
-    // Debug helper to check visibility
-    setInterval(() => {
-        const analysisSection = document.getElementById('analysisSection');
-        const analysisResultDiv = document.getElementById('analysisResult');
-        const resultDiv = document.getElementById('result');
-        
-        if (analysisSection && !analysisSection.classList.contains('hidden')) {
-            console.log('Analysis visibility check:', {
-                analysisSection: analysisSection.style.display,
-                analysisResult: analysisResultDiv ? analysisResultDiv.style.display : 'not found',
-                result: resultDiv ? resultDiv.style.display : 'not found'
-            });
-        }
-    }, 3000);
+    }, 2000); // Less frequent updates to reduce performance impact
 });
