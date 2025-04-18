@@ -591,12 +591,12 @@ document.addEventListener('DOMContentLoaded', () => {
         analysisBlockDuration.parentNode.insertBefore(refreshButton, analysisBlockDuration);
     }
     
-    // Set up interval to refresh analysis UI
+    // Set up interval to refresh analysis UI - updating to 1 second for more frequent timer updates
     setInterval(() => {
         if (storageState.activeSection === 'analysisSection' && 
             document.getElementById('analysisSection') && 
             !document.getElementById('analysisSection').classList.contains('hidden')) {
             updateAnalysisUI();
         }
-    }, 2000); // Less frequent updates to reduce performance impact
+    }, 1000); // Update every second for real-time timer
 });
