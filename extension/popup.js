@@ -171,6 +171,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Function to update only the time remaining display (for frequent updates)
+    function updateTimeRemainingDisplay() {
+        if (storageState.activeSection !== 'analysisSection') return;
+        
+        const timeElement = document.querySelector('.session-value.time');
+        if (!timeElement) return;
+        
+        chromeStorage.get(['sessionData']).then(sessionData => {
+            if (sessionData.sessionData && sessionData.sessionData.endTime) {
+                const timeLeft = sessionData.sessionData.endTime - Date.now();
+                if (timeLeft > 0) {
+                    const hours = Math.floor(timeLeft / (60 * 60 * 1000));
+                    const minutes = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000));
+                    const seconds = Math.floor((timeLeft % (60 * 1000)) / 1000);
+                    
+                    timeElement.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                } else {
+                    timeElement.textContent = '00:00:00';
+                }
+            }
+        });
+    }
+
     // Save form state after any change
     function saveFormState() {
         storageState.blockDuration = document.getElementById('blockDuration').value;
@@ -596,7 +619,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (storageState.activeSection === 'analysisSection' && 
             document.getElementById('analysisSection') && 
             !document.getElementById('analysisSection').classList.contains('hidden')) {
-            updateAnalysisUI();
+            updateTimeRemainingDisplay();
         }
     }, 1000); // Update every second for real-time timer
 });
