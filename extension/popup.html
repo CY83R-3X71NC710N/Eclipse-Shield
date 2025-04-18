@@ -125,20 +125,19 @@
 
         /* Analysis section styling */
         #analysisResult {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 100vw;
-            height: 100vh;
+            position: relative;
+            width: 100%;
+            height: auto;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            background: rgba(0, 0, 0, 0.95);
-            z-index: 1000;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 2;
             margin: 0;
-            padding: 0;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.2);
         }
 
         #analysisResult h3 {
@@ -651,8 +650,14 @@
             z-index: 2;
             display: flex;
             flex-direction: column;
-            justify-content: center;
-            height: 100%;
+            justify-content: flex-start;
+            height: auto;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.8);
+            margin: 0;
+            border-radius: 5px;
         }
 
         #analysisBlockDuration {
@@ -676,7 +681,7 @@
             letter-spacing: 2px;
             text-shadow: 0 0 10px #0f0;
             font-size: 24px;
-            margin-bottom: 400px;
+            margin-bottom: 20px;
             animation: title-appear 0.5s ease-out;
             z-index: 3;
             background: rgba(0, 0, 0, 0.9);
