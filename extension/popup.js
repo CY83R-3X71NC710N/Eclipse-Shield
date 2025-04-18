@@ -749,20 +749,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Listen for URL analysis updates
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-        if (message.type === 'URL_ANALYSIS_UPDATE') {
-            storageState.analysisStatus.lastUrl = message.url;
-            storageState.analysisStatus.lastAction = message.action;
-            storageState.analysisStatus.lastReason = message.reason || '';
-            
-            // Update stats
-            chromeStorage.get(['blockedUrls', 'allowedUrls']).then(data => {
-                updateAnalysisStats(data);
-                saveFormState();
-            });
-        }
-        return true;
-    });
+    if (chrome?.runtime?.onMessage) {
+        chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+            if (message.type === 'URL_ANALYSIS_UPDATE') {
+                storageState.analysisStatus.lastUrl = message.url;
+                storageState.analysisStatus.lastAction = message.action;
+                storageState.analysisStatus.lastReason = message.reason || '';
+                
+                // Update stats
+                chromeStorage.get(['blockedUrls', 'allowedUrls']).then(data => {
+                    updateAnalysisStats(data);
+                    saveFormState();
+                });
+            }
+            return true;
+        });
+    } else {
+        console.log('Chrome runtime messaging not available, URL analysis updates will not be received');
+    }
     
     // Add refresh button for analysis
     const refreshButton = document.createElement('button');
