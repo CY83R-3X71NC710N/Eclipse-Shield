@@ -201,6 +201,50 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Function to initialize and manage a client-side countdown without relying on storage
+    function initClientSideTimer() {
+        if (storageState.activeSection !== 'analysisSection') return;
+        
+        const timeElement = document.querySelector('.session-value.time');
+        if (!timeElement) return;
+        
+        // Clear any existing timer
+        if (window.countdownInterval) {
+            clearInterval(window.countdownInterval);
+        }
+        
+        // Get the initial end time from storage once
+        chromeStorage.get(['sessionData']).then(data => {
+            if (!data.sessionData || !data.sessionData.endTime) return;
+            
+            // Calculate end time (server time)
+            const endTime = data.sessionData.endTime;
+            
+            // Create a function that will update the timer display
+            function updateDisplay() {
+                const now = Date.now();
+                const timeLeft = Math.max(0, endTime - now);
+                
+                if (timeLeft > 0) {
+                    const hours = Math.floor(timeLeft / (60 * 60 * 1000));
+                    const minutes = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000));
+                    const seconds = Math.floor((timeLeft % (60 * 1000)) / 1000);
+                    
+                    const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    timeElement.textContent = timeString;
+                } else {
+                    timeElement.textContent = '00:00:00';
+                }
+            }
+            
+            // Update immediately
+            updateDisplay();
+            
+            // Set interval to update every second
+            window.countdownInterval = setInterval(updateDisplay, 1000);
+        });
+    }
+
     // Save form state after any change
     function saveFormState() {
         storageState.blockDuration = document.getElementById('blockDuration').value;
@@ -266,6 +310,12 @@ document.addEventListener('DOMContentLoaded', () => {
                             resultDiv.classList.remove('hidden');
                             resultDiv.style.display = 'block';
                         }
+                        
+                        // Start the client-side timer when restoring to the analysis section
+                        setTimeout(() => {
+                            console.log('Starting client-side timer from restore');
+                            initClientSideTimer();
+                        }, 100);
                         
                         // Trigger immediate UI update
                         setTimeout(updateAnalysisUI, 0);
@@ -516,6 +566,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Show analysis UI immediately
             updateAnalysisUI();
+            
+            // Initialize the client-side timer right away
+            setTimeout(() => {
+                initClientSideTimer();
+                
+                // Also add a manual timer directly in the DOM
+                const timeElement = document.querySelector('.session-value.time');
+                if (timeElement) {
+                    const endTime = Date.now() + sessionDuration.sessionDuration;
+                    
+                    // Create a self-updating timer using vanilla JS
+                    let timerInterval = setInterval(() => {
+                        const now = Date.now();
+                        const remaining = Math.max(0, endTime - now);
+                        
+                        if (remaining > 0) {
+                            const h = Math.floor(remaining / (60 * 60 * 1000));
+                            const m = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
+                            const s = Math.floor((remaining % (60 * 1000)) / 1000);
+                            
+                            timeElement.textContent = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                        } else {
+                            timeElement.textContent = '00:00:00';
+                            clearInterval(timerInterval);
+                        }
+                    }, 1000);
+                    
+                    // Store the interval ID for cleanup
+                    window.timerInterval = timerInterval;
+                }
+            }, 200);
 
             // Send message to parent
             const channel = new MessageChannel();
