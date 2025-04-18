@@ -175,42 +175,27 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateTimeRemainingDisplay() {
         if (storageState.activeSection !== 'analysisSection') return;
         const timeElement = document.querySelector('.session-value.time');
-        if (!timeElement) return;
+        if (!timeElement) {
+            console.log('Time element not found');
+            return;
+        }
         
-        // Step 1: Get the end time from storage just once
+        console.log('Updating time display');
+        
+        // Use direct chrome.storage.local.get for live updates
         chrome.storage.local.get(['sessionData'], (data) => {
             if (data.sessionData && data.sessionData.endTime) {
-                // Store the end time in a variable
-                const endTime = data.sessionData.endTime;
-                
-                // Step 2: Create a direct interval that doesn't rely on storage
-                // Clear any existing interval first
-                if (window.timerInterval) {
-                    clearInterval(window.timerInterval);
-                }
-                
-                // Step 3: Update immediately
-                updateTimeDisplay();
-                
-                // Step 4: Set up an interval that updates every second
-                window.timerInterval = setInterval(updateTimeDisplay, 1000);
-                
-                // Step 5: Create a function that calculates time remaining on each tick
-                function updateTimeDisplay() {
-                    const timeLeft = endTime - Date.now();
-                    if (timeLeft > 0) {
-                        const hours = Math.floor(timeLeft / (60 * 60 * 1000));
-                        const minutes = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000));
-                        const seconds = Math.floor((timeLeft % (60 * 1000)) / 1000);
-                        
-                        // Update the display directly (not through storage)
-                        timeElement.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                        console.log('Timer updated:', timeElement.textContent);
-                    } else {
-                        timeElement.textContent = '00:00:00';
-                        // Clear the interval if time has expired
-                        clearInterval(window.timerInterval);
-                    }
+                const timeLeft = data.sessionData.endTime - Date.now();
+                if (timeLeft > 0) {
+                    const hours = Math.floor(timeLeft / (60 * 60 * 1000));
+                    const minutes = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000));
+                    const seconds = Math.floor((timeLeft % (60 * 1000)) / 1000);
+                    
+                    const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    console.log('Setting time to:', timeString);
+                    timeElement.textContent = timeString;
+                } else {
+                    timeElement.textContent = '00:00:00';
                 }
             }
         });
