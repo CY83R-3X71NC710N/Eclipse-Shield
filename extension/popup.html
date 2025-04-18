@@ -760,6 +760,257 @@
             border-radius: 5px;
             background: rgba(255, 68, 68, 0.1);
         }
+        
+        /* Analysis stats styles */
+        .analysis-stats {
+            background: rgba(0, 20, 0, 0.4);
+            border: 1px solid #0f0;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
+        }
+        
+        .analysis-stats h4 {
+            color: #0f0;
+            margin-top: 0;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-shadow: 0 0 5px #0f0;
+            text-align: center;
+            position: relative;
+        }
+        
+        .analysis-stats h4::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 25%;
+            width: 50%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #0f0, transparent);
+            box-shadow: 0 0 5px #0f0;
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 5px 0;
+            border-bottom: 1px dashed rgba(0, 255, 0, 0.3);
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            color: #88ff88;
+        }
+        
+        .stat-value {
+            font-weight: bold;
+            font-size: 1.1em;
+            color: #0f0;
+            text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+        }
+        
+        .stat-value.allowed {
+            color: #00ff00;
+        }
+        
+        .stat-value.blocked {
+            color: #ff4444;
+        }
+        
+        /* Latest activity styles */
+        .latest-activity {
+            background: rgba(0, 20, 0, 0.4);
+            border: 1px solid #0f0;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
+        }
+        
+        .latest-activity h4 {
+            color: #0f0;
+            margin-top: 0;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-shadow: 0 0 5px #0f0;
+            text-align: center;
+            position: relative;
+        }
+        
+        .latest-activity h4::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 25%;
+            width: 50%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #0f0, transparent);
+            box-shadow: 0 0 5px #0f0;
+        }
+        
+        .activity-item {
+            background: rgba(0, 30, 0, 0.5);
+            padding: 10px;
+            border-radius: 3px;
+            border-left: 3px solid #0f0;
+        }
+        
+        .activity-item.blocked {
+            border-left-color: #ff4444;
+            background: rgba(30, 0, 0, 0.5);
+        }
+        
+        .activity-item.allowed {
+            border-left-color: #00ff00;
+            background: rgba(0, 30, 0, 0.5);
+        }
+        
+        .activity-item.neutral {
+            border-left-color: #ffff00;
+            background: rgba(20, 20, 0, 0.5);
+        }
+        
+        .activity-url {
+            font-size: 0.9em;
+            word-break: break-all;
+            margin-bottom: 5px;
+            color: #bbffbb;
+        }
+        
+        .activity-status {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .activity-status.blocked {
+            color: #ff4444;
+            text-shadow: 0 0 5px rgba(255, 68, 68, 0.5);
+        }
+        
+        .activity-status.allowed {
+            color: #00ff00;
+            text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+        }
+        
+        .activity-reason {
+            font-size: 0.85em;
+            font-style: italic;
+            color: #88ff88;
+            border-top: 1px dashed rgba(0, 255, 0, 0.3);
+            padding-top: 5px;
+            margin-top: 5px;
+        }
+        
+        .activity-info {
+            font-size: 0.9em;
+            color: #dddddd;
+            text-align: center;
+            padding: 10px 0;
+        }
+        
+        /* Session info styles */
+        .session-info {
+            background: rgba(0, 20, 0, 0.4);
+            border: 1px solid #0f0;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
+        }
+        
+        .session-info h4 {
+            color: #0f0;
+            margin-top: 0;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-shadow: 0 0 5px #0f0;
+            text-align: center;
+            position: relative;
+        }
+        
+        .session-info h4::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 25%;
+            width: 50%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #0f0, transparent);
+            box-shadow: 0 0 5px #0f0;
+        }
+        
+        .session-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 5px 0;
+            border-bottom: 1px dashed rgba(0, 255, 0, 0.3);
+        }
+        
+        .session-label {
+            font-size: 0.9em;
+            color: #88ff88;
+        }
+        
+        .session-value {
+            font-weight: bold;
+            color: #0f0;
+            text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+        }
+        
+        .session-value.domain {
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .session-value.time {
+            font-family: 'Share Tech Mono', monospace;
+            letter-spacing: 2px;
+            font-size: 1.1em;
+            animation: pulse 2s infinite;
+        }
+        
+        /* Refresh button styles */
+        #refreshAnalysis {
+            margin: 10px auto 20px auto;
+            padding: 8px 15px;
+            width: auto;
+            display: block;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.9em;
+            background: rgba(0, 40, 0, 0.8);
+            border: 1px solid #0f0;
+            color: #0f0;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #refreshAnalysis:hover {
+            background: rgba(0, 60, 0, 0.8);
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+        }
+        
+        #refreshAnalysis::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(0, 255, 0, 0.1), transparent);
+            transform: rotate(45deg);
+            animation: shine 3s infinite;
+        }
     </style>
 </head>
 <body>

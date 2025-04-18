@@ -36,19 +36,127 @@ document.addEventListener('DOMContentLoaded', () => {
         domainSelection: '',
         currentQuestion: '',
         currentAnswer: '',
-        activeSection: 'blockDurationSelect'
+        activeSection: 'blockDurationSelect',
+        analysisStatus: {
+            totalSites: 0,
+            blockedSites: 0,
+            allowedSites: 0,
+            lastUrl: '',
+            lastAction: '',
+            lastReason: ''
+        }
     };
 
     // Initialize by checking storage
-    chromeStorage.get(['formState']).then(data => {
+    chromeStorage.get(['formState', 'blockedUrls', 'allowedUrls']).then(data => {
         console.log('Initial storage and form state:', data);
         if (data.formState) {
             storageState = {...storageState, ...data.formState};
             restoreFormState();
         }
+        
+        // Update analysis stats
+        updateAnalysisStats(data);
     }).catch(err => {
         console.error('Storage access error:', err);
     });
+
+    // Function to update analysis statistics
+    function updateAnalysisStats(data) {
+        if (data.blockedUrls) {
+            storageState.analysisStatus.blockedSites = Object.keys(data.blockedUrls).length;
+        }
+        if (data.allowedUrls) {
+            storageState.analysisStatus.allowedSites = Object.keys(data.allowedUrls).length;
+        }
+        
+        storageState.analysisStatus.totalSites = 
+            storageState.analysisStatus.blockedSites + 
+            storageState.analysisStatus.allowedSites;
+            
+        // Update the UI
+        updateAnalysisUI();
+    }
+    
+    // Function to update analysis UI
+    function updateAnalysisUI() {
+        const analysisSection = document.getElementById('analysisSection');
+        if (!analysisSection) return;
+        
+        const resultDiv = document.getElementById('result');
+        if (!resultDiv) return;
+        
+        const stats = storageState.analysisStatus;
+        
+        // Create the analysis display
+        let statusHtml = `
+            <div class="analysis-stats">
+                <h4>SESSION STATISTICS</h4>
+                <div class="stat-item">
+                    <span class="stat-label">Sites Analyzed</span>
+                    <span class="stat-value">${stats.totalSites}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Sites Allowed</span>
+                    <span class="stat-value allowed">${stats.allowedSites}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Sites Blocked</span>
+                    <span class="stat-value blocked">${stats.blockedSites}</span>
+                </div>
+            </div>`;
+            
+        // Add latest activity if available
+        if (stats.lastUrl) {
+            const actionClass = stats.lastAction === 'blocked' ? 'blocked' : 'allowed';
+            statusHtml += `
+                <div class="latest-activity">
+                    <h4>LATEST ACTIVITY</h4>
+                    <div class="activity-item ${actionClass}">
+                        <div class="activity-url">${stats.lastUrl}</div>
+                        <div class="activity-status ${actionClass}">${stats.lastAction.toUpperCase()}</div>
+                        ${stats.lastReason ? `<div class="activity-reason">${stats.lastReason}</div>` : ''}
+                    </div>
+                </div>`;
+        } else {
+            statusHtml += `
+                <div class="latest-activity">
+                    <h4>LATEST ACTIVITY</h4>
+                    <div class="activity-item neutral">
+                        <div class="activity-status">No sites visited yet</div>
+                        <div class="activity-info">Your browsing statistics will appear here</div>
+                    </div>
+                </div>`;
+        }
+        
+        // Add session info
+        chromeStorage.get(['sessionData', 'domain']).then(sessionData => {
+            if (sessionData.sessionData) {
+                const timeLeft = sessionData.sessionData.endTime - Date.now();
+                const hours = Math.floor(timeLeft / (60 * 60 * 1000));
+                const minutes = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000));
+                const seconds = Math.floor((timeLeft % (60 * 1000)) / 1000);
+                
+                statusHtml += `
+                    <div class="session-info">
+                        <h4>SESSION INFO</h4>
+                        <div class="session-item">
+                            <span class="session-label">Domain</span>
+                            <span class="session-value domain">${sessionData.domain || 'Not set'}</span>
+                        </div>
+                        <div class="session-item">
+                            <span class="session-label">Time Remaining</span>
+                            <span class="session-value time">${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}</span>
+                        </div>
+                    </div>`;
+            }
+            
+            // Set the HTML content
+            resultDiv.classList.remove('hidden');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = statusHtml;
+        });
+    }
 
     // Save form state after any change
     function saveFormState() {
@@ -307,10 +415,12 @@ document.addEventListener('DOMContentLoaded', () => {
             storageState.activeSection = 'analysisSection';
             saveFormState();
             
+            // Get all stored data
             const sessionDuration = await chromeStorage.get('sessionDuration');
             const domain = storageState.domain;
             const context = storageState.context;
             
+            // Create session data
             const sessionData = {
                 state: 'active',
                 startTime: Date.now(),
@@ -318,6 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 domain: domain
             };
             
+            // Store complete session state
             await chromeStorage.set({
                 sessionData: sessionData,
                 domain: domain,
@@ -330,13 +441,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 context
             });
 
+            // Show analysis UI immediately
+            updateAnalysisUI();
+
+            // Send message to parent
             const channel = new MessageChannel();
             channel.port1.onmessage = (event) => {
                 if (event.data.success) {
                     document.getElementById('result').classList.remove('hidden');
                     document.getElementById('result').style.display = 'block';
-                    document.getElementById('result').innerHTML = 
-                        'Session started. Websites will now be analyzed based on your task context.';
+                    updateAnalysisUI();
                 } else {
                     document.getElementById('result').innerHTML = 
                         'Failed to start session. Please try again.';
@@ -378,4 +492,43 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    // Listen for URL analysis updates
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        if (message.type === 'URL_ANALYSIS_UPDATE') {
+            storageState.analysisStatus.lastUrl = message.url;
+            storageState.analysisStatus.lastAction = message.action;
+            storageState.analysisStatus.lastReason = message.reason || '';
+            
+            // Update stats
+            chromeStorage.get(['blockedUrls', 'allowedUrls']).then(data => {
+                updateAnalysisStats(data);
+                saveFormState();
+            });
+        }
+        return true;
+    });
+    
+    // Add refresh button for analysis
+    const refreshButton = document.createElement('button');
+    refreshButton.id = 'refreshAnalysis';
+    refreshButton.textContent = 'Refresh Stats';
+    refreshButton.addEventListener('click', () => {
+        chromeStorage.get(['blockedUrls', 'allowedUrls']).then(data => {
+            updateAnalysisStats(data);
+        });
+    });
+    
+    // Append refresh button to analysis section
+    const analysisBlockDuration = document.getElementById('analysisBlockDuration');
+    if (analysisBlockDuration) {
+        analysisBlockDuration.parentNode.insertBefore(refreshButton, analysisBlockDuration);
+    }
+    
+    // Set up interval to refresh analysis UI
+    setInterval(() => {
+        if (document.getElementById('analysisSection').style.display !== 'none') {
+            updateAnalysisUI();
+        }
+    }, 1000);
 });
