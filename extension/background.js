@@ -3,12 +3,13 @@ let isAnalyzing = false;
 let activeUrls = new Set();
 
 // Initialize storage
-chrome.storage.local.get(['blockedUrls', 'allowedUrls'], (data) => {
-    if (!data.blockedUrls) {
-        chrome.storage.local.set({ blockedUrls: {} });
-    }
-    if (!data.allowedUrls) {
-        chrome.storage.local.set({ allowedUrls: {} });
+chrome.storage.local.get(['blockedUrls', 'allowedUrls'], async (data) => {
+    if (!data.blockedUrls || !data.allowedUrls) {
+        await chrome.storage.local.set({
+            blockedUrls: {},
+            allowedUrls: {}
+        });
+        console.log('Initialized URL tracking storage.');
     }
 });
 

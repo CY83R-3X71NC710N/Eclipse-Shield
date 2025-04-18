@@ -260,8 +260,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         console.log('Updating time display');
         
-        // Use direct chrome.storage.local.get for live updates
-        chrome.storage.local.get(['sessionData'], (data) => {
+        // Use chromeStorage wrapper instead of directly accessing chrome.storage.local
+        chromeStorage.get(['sessionData']).then(data => {
             if (data.sessionData && data.sessionData.endTime) {
                 const timeLeft = data.sessionData.endTime - Date.now();
                 if (timeLeft > 0) {
@@ -276,6 +276,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     timeElement.textContent = '00:00:00';
                 }
             }
+        }).catch(error => {
+            console.error('Error getting sessionData:', error);
         });
     }
 
