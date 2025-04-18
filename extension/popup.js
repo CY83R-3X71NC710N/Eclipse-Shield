@@ -210,6 +210,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     element.classList.remove('hidden');
                     if (section === 'analysisSection') {
                         element.style.display = 'block';
+                        // Also ensure analysisResult is visible if restoring to analysisSection
+                        const analysisResultDiv = document.getElementById('analysisResult');
+                        if (analysisResultDiv) {
+                            analysisResultDiv.classList.remove('hidden');
+                            analysisResultDiv.style.display = 'block';
+                        }
+                        // Also ensure the result div itself is visible
+                        const resultDiv = document.getElementById('result');
+                        if (resultDiv) {
+                            resultDiv.classList.remove('hidden');
+                            resultDiv.style.display = 'block';
+                        }
+                        // Trigger initial UI update when restoring to analysis section
+                        updateAnalysisUI();
                     }
                 } else {
                     element.classList.add('hidden');
@@ -412,6 +426,12 @@ document.addEventListener('DOMContentLoaded', () => {
             contextQuestions.classList.add('hidden');
             analysisSection.classList.remove('hidden');
             analysisSection.style.display = 'block';
+            // Ensure the container for the results is also visible
+            const analysisResultDiv = document.getElementById('analysisResult');
+            if (analysisResultDiv) {
+                analysisResultDiv.classList.remove('hidden');
+                analysisResultDiv.style.display = 'block'; 
+            }
             storageState.activeSection = 'analysisSection';
             saveFormState();
             
@@ -447,15 +467,26 @@ document.addEventListener('DOMContentLoaded', () => {
             // Send message to parent
             const channel = new MessageChannel();
             channel.port1.onmessage = (event) => {
+                console.log('Message received from parent:', event.data);
                 if (event.data.success) {
-                    document.getElementById('result').classList.remove('hidden');
-                    document.getElementById('result').style.display = 'block';
-                    updateAnalysisUI();
+                    // Ensure the #result div itself is visible after success
+                    const resultDiv = document.getElementById('result');
+                    if (resultDiv) {
+                        resultDiv.classList.remove('hidden');
+                        resultDiv.style.display = 'block';
+                    }
+                    updateAnalysisUI(); // Update UI with initial stats
                 } else {
                     document.getElementById('result').innerHTML = 
-                        'Failed to start session. Please try again.';
+                        '<div class="error">Failed to start session. Please try again.</div>';
+                    // Make sure error is visible
+                    const resultDiv = document.getElementById('result');
+                    if (resultDiv) {
+                        resultDiv.classList.remove('hidden');
+                        resultDiv.style.display = 'block';
+                    }
                 }
-                saveFormState();
+                saveFormState(); // Save state after potential UI changes
             };
 
             window.parent.postMessage({
@@ -467,8 +498,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error('Error in startAnalysis:', error);
-            document.getElementById('result').innerHTML = 
-                'An unexpected error occurred. Please try again.';
+            const resultDiv = document.getElementById('result');
+            if (resultDiv) {
+                resultDiv.innerHTML = 
+                    '<div class="error">An unexpected error occurred. Please try again.</div>';
+                // Make sure error is visible
+                resultDiv.classList.remove('hidden');
+                resultDiv.style.display = 'block';
+                // Also ensure the parent container is visible
+                const analysisResultDiv = document.getElementById('analysisResult');
+                if (analysisResultDiv) {
+                    analysisResultDiv.classList.remove('hidden');
+                    analysisResultDiv.style.display = 'block'; 
+                }
+            }
             saveFormState();
         }
     }
