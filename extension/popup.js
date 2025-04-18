@@ -83,8 +83,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const analysisSection = document.getElementById('analysisSection');
         if (!analysisSection) return;
         
+        // Ensure the section is visible
+        analysisSection.classList.remove('hidden');
+        analysisSection.style.display = 'block';
+        
+        // Ensure the analysis result container is visible
+        const analysisResultDiv = document.getElementById('analysisResult');
+        if (analysisResultDiv) {
+            analysisResultDiv.classList.remove('hidden');
+            analysisResultDiv.style.display = 'block';
+        }
+        
         const resultDiv = document.getElementById('result');
         if (!resultDiv) return;
+        
+        // Ensure the result div is visible
+        resultDiv.classList.remove('hidden');
+        resultDiv.style.display = 'block';
         
         const stats = storageState.analysisStatus;
         
@@ -151,9 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>`;
             }
             
-            // Set the HTML content
-            resultDiv.classList.remove('hidden');
-            resultDiv.style.display = 'block';
+            console.log('Setting result HTML content', statusHtml);
             resultDiv.innerHTML = statusHtml;
         });
     }
@@ -210,26 +223,25 @@ document.addEventListener('DOMContentLoaded', () => {
                     element.classList.remove('hidden');
                     if (section === 'analysisSection') {
                         element.style.display = 'block';
-                        // Also ensure analysisResult is visible if restoring to analysisSection
+                        
+                        // Make sure all analysis divs are visible
                         const analysisResultDiv = document.getElementById('analysisResult');
                         if (analysisResultDiv) {
                             analysisResultDiv.classList.remove('hidden');
                             analysisResultDiv.style.display = 'block';
                         }
-                        // Also ensure the result div itself is visible
+                        
                         const resultDiv = document.getElementById('result');
                         if (resultDiv) {
                             resultDiv.classList.remove('hidden');
                             resultDiv.style.display = 'block';
                         }
-                        // Trigger initial UI update when restoring to analysis section
-                        updateAnalysisUI();
+                        
+                        // Trigger immediate UI update
+                        setTimeout(updateAnalysisUI, 0);
                     }
                 } else {
                     element.classList.add('hidden');
-                    if (section === 'analysisSection') {
-                        element.style.display = 'none';
-                    }
                 }
             }
         });
@@ -424,14 +436,25 @@ document.addEventListener('DOMContentLoaded', () => {
     async function startAnalysis() {
         try {
             contextQuestions.classList.add('hidden');
+            
+            // Make sure all analysis containers are visible
             analysisSection.classList.remove('hidden');
             analysisSection.style.display = 'block';
-            // Ensure the container for the results is also visible
+            
             const analysisResultDiv = document.getElementById('analysisResult');
             if (analysisResultDiv) {
                 analysisResultDiv.classList.remove('hidden');
                 analysisResultDiv.style.display = 'block'; 
             }
+            
+            const resultDiv = document.getElementById('result');
+            if (resultDiv) {
+                resultDiv.classList.remove('hidden');
+                resultDiv.style.display = 'block';
+                // Add initial content to show it's working
+                resultDiv.innerHTML = '<div class="loading">Initializing analysis panel...</div>';
+            }
+            
             storageState.activeSection = 'analysisSection';
             saveFormState();
             
@@ -574,4 +597,19 @@ document.addEventListener('DOMContentLoaded', () => {
             updateAnalysisUI();
         }
     }, 1000);
+
+    // Debug helper to check visibility
+    setInterval(() => {
+        const analysisSection = document.getElementById('analysisSection');
+        const analysisResultDiv = document.getElementById('analysisResult');
+        const resultDiv = document.getElementById('result');
+        
+        if (analysisSection && !analysisSection.classList.contains('hidden')) {
+            console.log('Analysis visibility check:', {
+                analysisSection: analysisSection.style.display,
+                analysisResult: analysisResultDiv ? analysisResultDiv.style.display : 'not found',
+                result: resultDiv ? resultDiv.style.display : 'not found'
+            });
+        }
+    }, 3000);
 });
