@@ -338,7 +338,7 @@ class ProductivityAnalyzer:
                          logger.debug(f"ProductivityAnalyzer._is_productive_domain - Blocked keyword '{keyword}' found in URL. Returning False")
                          return False
              else:
-                 logger.warning(f"ProductivityAnalyzer._is_productive_domain - 'blocked_keywords' for domain '{domain}' is not a list.")
+                 logger.warning(f"_is_productive_domain - 'blocked_keywords' for domain '{domain}' is not a list.")
 
              logger.debug("ProductivityAnalyzer._is_productive_domain - No explicit productive/blocked rule matched based on settings. Returning None for further analysis.")
              return None # Needs further analysis (like context or AI)
@@ -418,8 +418,14 @@ class ProductivityAnalyzer:
             signals['error'] = str(e)
             return signals
 
-    def _check_context_relevance(self, url: str, url_signals: dict) -> dict:
-        """Check relevance of URL and its signals against stored context data."""
+    def _check_context_relevance(self, url: str, url_signals=None) -> dict:
+        """Check relevance of URL and its signals against stored context data.
+        
+        Args:
+            url: The URL to check
+            url_signals: Either a dictionary of URL signals or a string containing
+                        the search query directly
+        """
         # Initialize result structure
         relevance = {
             'score': 0.0,
@@ -456,13 +462,21 @@ class ProductivityAnalyzer:
             if not context_terms:
                  logger.warning("_check_context_relevance - No usable terms extracted from context data.")
                  return relevance
-
+            
             logger.debug(f"_check_context_relevance - Context terms generated ({len(context_terms)}): {context_terms[:20]}...") # Log first few terms
 
             # --- Check against URL components ---
             url_lower = url.lower()
-            search_query = url_signals.get('search_query', '') # Already decoded
-
+            
+            # Handle different types of url_signals input
+            search_query = ""
+            if isinstance(url_signals, dict):
+                # If url_signals is a dictionary, get search_query from it
+                search_query = url_signals.get('search_query', '')
+            elif isinstance(url_signals, str):
+                # If url_signals is a string, treat it as the search query directly
+                search_query = url_signals
+            
             # Check full URL (weight: 0.3)
             for term in context_terms:
                 if term in url_lower:
@@ -474,6 +488,7 @@ class ProductivityAnalyzer:
             if search_query:
                 query_lower = search_query.lower()
                 logger.debug(f"_check_context_relevance - Checking search query: '{query_lower}'")
+                
                 for term in context_terms:
                     if term in query_lower:
                         relevance['score'] += 0.5
@@ -596,7 +611,7 @@ class ProductivityAnalyzer:
             logger.debug(f"analyze_website - Context relevance result: {context_relevance}")
 
             # Decision based on high context relevance
-            if context_relevance.get('score', 0.0) > 0.7:
+            if context_relevance.get('score', 0.7) > 0.7:
                 logger.info(f"analyze_website - ALLOWED: High context relevance ({context_relevance['score']}) for URL '{url}'.")
                 return True
 
