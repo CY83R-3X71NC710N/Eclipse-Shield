@@ -120,8 +120,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>`;
                 
-            // Add latest activity if available
-            if (stats.lastUrl) {
+            // Add latest activity if available - improved check to verify lastUrl has content
+            if (stats.lastUrl && stats.lastUrl.trim() !== '') {
+                console.log('Found last URL activity:', stats.lastUrl, stats.lastAction);
                 const actionClass = stats.lastAction === 'blocked' ? 'blocked' : 'allowed';
                 statusHtml += `
                     <div class="latest-activity">
@@ -133,14 +134,30 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </div>`;
             } else {
-                statusHtml += `
-                    <div class="latest-activity">
-                        <h4>LATEST ACTIVITY</h4>
-                        <div class="activity-item neutral">
-                            <div class="activity-status">No sites visited yet</div>
-                            <div class="activity-info">Your browsing statistics will appear here</div>
-                        </div>
-                    </div>`;
+                // Debug log to understand why we're showing "no sites" message
+                console.log('No last URL activity found in state:', stats);
+                
+                // Only show "No sites visited" if totalSites is actually 0
+                if (stats.totalSites === 0) {
+                    statusHtml += `
+                        <div class="latest-activity">
+                            <h4>LATEST ACTIVITY</h4>
+                            <div class="activity-item neutral">
+                                <div class="activity-status">No sites visited yet</div>
+                                <div class="activity-info">Your browsing statistics will appear here</div>
+                            </div>
+                        </div>`;
+                } else {
+                    // We have site stats but no last URL - show a more accurate message
+                    statusHtml += `
+                        <div class="latest-activity">
+                            <h4>LATEST ACTIVITY</h4>
+                            <div class="activity-item neutral">
+                                <div class="activity-status">Site activity detected</div>
+                                <div class="activity-info">${stats.totalSites} sites have been analyzed</div>
+                            </div>
+                        </div>`;
+                }
             }
             
             // Add session info
