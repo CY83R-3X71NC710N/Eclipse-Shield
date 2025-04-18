@@ -178,15 +178,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const timeElement = document.querySelector('.session-value.time');
         if (!timeElement) return;
         
-        chromeStorage.get(['sessionData']).then(sessionData => {
-            if (sessionData.sessionData && sessionData.sessionData.endTime) {
-                const timeLeft = sessionData.sessionData.endTime - Date.now();
+        // Use a direct approach instead of storage to avoid latency
+        chromeStorage.get(['sessionData']).then(data => {
+            if (data.sessionData && data.sessionData.endTime) {
+                const timeLeft = data.sessionData.endTime - Date.now();
                 if (timeLeft > 0) {
                     const hours = Math.floor(timeLeft / (60 * 60 * 1000));
                     const minutes = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000));
                     const seconds = Math.floor((timeLeft % (60 * 1000)) / 1000);
                     
+                    // Force DOM update with current time
                     timeElement.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    
+                    // Trigger a DOM reflow to ensure update is visible
+                    void timeElement.offsetHeight;
                 } else {
                     timeElement.textContent = '00:00:00';
                 }
@@ -614,12 +619,19 @@ document.addEventListener('DOMContentLoaded', () => {
         analysisBlockDuration.parentNode.insertBefore(refreshButton, analysisBlockDuration);
     }
     
-    // Set up interval to refresh analysis UI - updating to 1 second for more frequent timer updates
+    // Set up interval to refresh the timer every second and full UI occasionally
     setInterval(() => {
         if (storageState.activeSection === 'analysisSection' && 
             document.getElementById('analysisSection') && 
             !document.getElementById('analysisSection').classList.contains('hidden')) {
+                
+            // Call the dedicated timer update function
             updateTimeRemainingDisplay();
+            
+            // Occasionally refresh the full UI (every 10 seconds)
+            if (Date.now() % 10000 < 1000) {
+                updateAnalysisUI();
+            }
         }
     }, 1000); // Update every second for real-time timer
 });
