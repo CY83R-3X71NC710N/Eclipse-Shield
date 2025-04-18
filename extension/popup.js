@@ -174,24 +174,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // Function to update only the time remaining display (for frequent updates)
     function updateTimeRemainingDisplay() {
         if (storageState.activeSection !== 'analysisSection') return;
-        
         const timeElement = document.querySelector('.session-value.time');
         if (!timeElement) return;
-        
-        // Use a direct approach instead of storage to avoid latency
-        chromeStorage.get(['sessionData']).then(data => {
+        // Use direct chrome.storage.local.get for live updates
+        chrome.storage.local.get(['sessionData'], (data) => {
             if (data.sessionData && data.sessionData.endTime) {
                 const timeLeft = data.sessionData.endTime - Date.now();
                 if (timeLeft > 0) {
                     const hours = Math.floor(timeLeft / (60 * 60 * 1000));
                     const minutes = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000));
                     const seconds = Math.floor((timeLeft % (60 * 1000)) / 1000);
-                    
-                    // Force DOM update with current time
                     timeElement.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                    
-                    // Trigger a DOM reflow to ensure update is visible
-                    void timeElement.offsetHeight;
                 } else {
                     timeElement.textContent = '00:00:00';
                 }
