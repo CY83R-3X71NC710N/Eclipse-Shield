@@ -148,44 +148,105 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </div>`;
                 } else {
-                    // We have site stats but no last URL - show a more accurate message
-                    statusHtml += `
-                        <div class="latest-activity">
-                            <h4>LATEST ACTIVITY</h4>
-                            <div class="activity-item neutral">
-                                <div class="activity-status">Site activity detected</div>
-                                <div class="activity-info">${stats.totalSites} sites have been analyzed</div>
-                            </div>
-                        </div>`;
+                    // Get recent URLs from storage to show the most recent one
+                    chromeStorage.get(['blockedUrls', 'allowedUrls']).then(urlData => {
+                        let latestUrl = '';
+                        let latestTimestamp = 0;
+                        let action = '';
+                        let reason = '';
+                        
+                        // Check blocked URLs for most recent
+                        if (urlData.blockedUrls) {
+                            Object.entries(urlData.blockedUrls).forEach(([url, data]) => {
+                                if (data.timestamp && data.timestamp > latestTimestamp) {
+                                    latestUrl = data.url || url;
+                                    latestTimestamp = data.timestamp;
+                                    action = 'blocked';
+                                    reason = data.reason || '';
+                                }
+                            });
+                        }
+                        
+                        // Check allowed URLs for most recent
+                        if (urlData.allowedUrls) {
+                            Object.entries(urlData.allowedUrls).forEach(([url, data]) => {
+                                if (data.timestamp && data.timestamp > latestTimestamp) {
+                                    latestUrl = data.url || url;
+                                    latestTimestamp = data.timestamp;
+                                    action = 'allowed';
+                                    reason = data.reason || '';
+                                }
+                            });
+                        }
+                        
+                        // Update the status HTML with grammatically correct text and URL if available
+                        const siteText = stats.totalSites === 1 ? 'site has' : 'sites have';
+                        let activityHtml = `
+                            <div class="latest-activity">
+                                <h4>LATEST ACTIVITY</h4>
+                                <div class="activity-item neutral">
+                                    <div class="activity-status">Site activity detected</div>
+                                    <div class="activity-info">${stats.totalSites} ${siteText} been analyzed</div>`;
+                        
+                        // Add URL info if available
+                        if (latestUrl) {
+                            const actionClass = action === 'blocked' ? 'blocked' : 'allowed';
+                            activityHtml += `
+                                    <div class="activity-url">Most recent: ${latestUrl}</div>
+                                    <div class="activity-status ${actionClass}">${action.toUpperCase()}</div>
+                                    ${reason ? `<div class="activity-reason">${reason}</div>` : ''}`;
+                        }
+                        
+                        activityHtml += `
+                                </div>
+                            </div>`;
+                            
+                        // Append to status HTML
+                        resultDiv.innerHTML = statusHtml + activityHtml;
+                        
+                        // If we have session data, add that too
+                        addSessionInfo(resultDiv, statusHtml + activityHtml);
+                    });
+                    
+                    // Return here since we're handling the UI update in the promise
+                    return;
                 }
             }
             
             // Add session info
-            chromeStorage.get(['sessionData', 'domain']).then(sessionData => {
-                if (sessionData.sessionData) {
-                    const timeLeft = sessionData.sessionData.endTime - Date.now();
-                    const hours = Math.floor(timeLeft / (60 * 60 * 1000));
-                    const minutes = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000));
-                    const seconds = Math.floor((timeLeft % (60 * 1000)) / 1000);
-                    
-                    statusHtml += `
-                        <div class="session-info">
-                            <h4>SESSION INFO</h4>
-                            <div class="session-item">
-                                <span class="session-label">Domain</span>
-                                <span class="session-value domain">${sessionData.domain || 'Not set'}</span>
-                            </div>
-                            <div class="session-item">
-                                <span class="session-label">Time Remaining</span>
-                                <span class="session-value time">${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}</span>
-                            </div>
-                        </div>`;
-                }
-                
-                console.log('Setting result HTML content', statusHtml);
-                resultDiv.innerHTML = statusHtml;
-            });
+            addSessionInfo(resultDiv, statusHtml);
         }
+    }
+    
+    // Helper function to add session info to the result div
+    function addSessionInfo(resultDiv, currentHtml) {
+        chromeStorage.get(['sessionData', 'domain']).then(sessionData => {
+            if (sessionData.sessionData) {
+                const timeLeft = sessionData.sessionData.endTime - Date.now();
+                const hours = Math.floor(timeLeft / (60 * 60 * 1000));
+                const minutes = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000));
+                const seconds = Math.floor((timeLeft % (60 * 1000)) / 1000);
+                
+                const sessionHtml = `
+                    <div class="session-info">
+                        <h4>SESSION INFO</h4>
+                        <div class="session-item">
+                            <span class="session-label">Domain</span>
+                            <span class="session-value domain">${sessionData.domain || 'Not set'}</span>
+                        </div>
+                        <div class="session-item">
+                            <span class="session-label">Time Remaining</span>
+                            <span class="session-value time">${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}</span>
+                        </div>
+                    </div>`;
+                
+                console.log('Setting result HTML content', currentHtml + sessionHtml);
+                resultDiv.innerHTML = currentHtml + sessionHtml;
+            } else {
+                console.log('Setting result HTML content', currentHtml);
+                resultDiv.innerHTML = currentHtml;
+            }
+        });
     }
 
     // Function to update only the time remaining display (for frequent updates)
