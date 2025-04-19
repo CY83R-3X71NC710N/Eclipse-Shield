@@ -684,9 +684,13 @@ class ProductivityAnalyzer:
 
                     if verdict == 'ALLOW':
                         logger.info(f"analyze_website - AI Verdict: ALLOW. Reason: {explanation}")
+                        # Log additional details for successful analysis that might be useful for debugging direct visits
+                        logger.info(f"analyze_website - DIRECT VISIT ALLOWED: URL={url}, DOMAIN={domain}, EXPLANATION={explanation}")
                         return True
                     elif verdict == 'BLOCK':
                         logger.info(f"analyze_website - AI Verdict: BLOCK. Reason: {explanation}")
+                        # Log additional details for unsuccessful analysis
+                        logger.info(f"analyze_website - DIRECT VISIT BLOCKED: URL={url}, DOMAIN={domain}, EXPLANATION={explanation}")
                         return False
                     else:
                         logger.warning(f"analyze_website - AI returned unexpected verdict '{verdict}'. Defaulting to BLOCK.")

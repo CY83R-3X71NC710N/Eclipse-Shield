@@ -154,6 +154,7 @@ def analyze():
         context = data.get('context', [])
         session_id = data.get('session_id')  # Get session ID from request
         referrer = data.get('referrer')  # Get the referrer info for direct visits
+        is_direct_visit = data.get('direct_visit', False)  # Flag indicating if this is a direct visit
 
         if not url or not domain:
             return jsonify({'error': 'Missing required fields'}), 400
@@ -200,6 +201,11 @@ def analyze():
             # Additional search signals to add if this is a direct visit with referrer
             additional_signals = {}
             
+            # Add direct visit flag to signals
+            if is_direct_visit:
+                additional_signals['is_direct_visit'] = True
+                logger.debug(f"Processing direct visit for URL: {url}")
+            
             # Check if referrer is a search engine and extract useful information
             if referrer:
                 logger.debug(f"Processing referrer information: {referrer}")
@@ -229,7 +235,7 @@ def analyze():
             # Merge additional signals from referrer if present
             if additional_signals:
                 url_signals.update(additional_signals)
-                logger.debug(f"Enhanced URL signals with referrer data: {url_signals}")
+                logger.debug(f"Enhanced URL signals with referrer/direct visit data: {url_signals}")
             
             context_relevance = analyzer._check_context_relevance(url, url_signals)
 
@@ -240,13 +246,18 @@ def analyze():
                 'signals': url_signals,
                 'context_relevance': context_relevance,
                 'context_used': context_dict,  # Add this for debugging
-                'referrer_data': additional_signals if additional_signals else None  # Include referrer analysis
+                'referrer_data': additional_signals if additional_signals else None,  # Include referrer analysis
+                'direct_visit': is_direct_visit  # Include direct visit flag in result
             }
 
             # Store result in cache with timestamp and session ID
             url_cache['data'][cache_key] = result
             url_cache['timestamps'][cache_key] = current_time
             url_cache['session_ids'][cache_key] = session_id
+            
+            # Log more details for direct visits to help with debugging
+            if is_direct_visit:
+                logger.info(f"Direct visit analysis result for {url}: isProductive={is_productive}, explanation={result['explanation']}")
 
             return jsonify(result)
 

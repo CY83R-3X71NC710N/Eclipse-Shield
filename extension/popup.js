@@ -63,16 +63,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Function to update analysis statistics
     function updateAnalysisStats(data) {
+        let blockedCount = 0;
+        let allowedCount = 0;
+
         if (data.blockedUrls) {
-            storageState.analysisStatus.blockedSites = Object.keys(data.blockedUrls).length;
-        }
-        if (data.allowedUrls) {
-            storageState.analysisStatus.allowedSites = Object.keys(data.allowedUrls).length;
+            blockedCount = Object.keys(data.blockedUrls).length;
         }
         
-        storageState.analysisStatus.totalSites = 
-            storageState.analysisStatus.blockedSites + 
-            storageState.analysisStatus.allowedSites;
+        if (data.allowedUrls) {
+            allowedCount = Object.keys(data.allowedUrls).length;
+        }
+
+        // Add counts from direct visits if available
+        if (data.directVisits) {
+            Object.values(data.directVisits).forEach(visit => {
+                if (visit.isProductive) {
+                    // Only count if it's not already in allowedUrls
+                    // This avoids double counting since we now store productive direct visits in both places
+                    const urlInAllowed = data.allowedUrls && Object.values(data.allowedUrls).some(
+                        allowed => allowed.url === visit.url
+                    );
+                    if (!urlInAllowed) {
+                        allowedCount++;
+                    }
+                } else {
+                    // Only count if not already in blockedUrls
+                    const urlInBlocked = data.blockedUrls && Object.values(data.blockedUrls).some(
+                        blocked => blocked.url === visit.url
+                    );
+                    if (!urlInBlocked) {
+                        blockedCount++;
+                    }
+                }
+            });
+        }
+        
+        storageState.analysisStatus.blockedSites = blockedCount;
+        storageState.analysisStatus.allowedSites = allowedCount;
+        storageState.analysisStatus.totalSites = blockedCount + allowedCount;
             
         // Update the UI
         updateAnalysisUI();

@@ -312,7 +312,7 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
         const blockedUrls = urlsData.blockedUrls || {};
         
         // Create a standardized key for checking
-        const urlKey = new URL(url).href;
+        const urlKey = normalizeUrl(url);
         
         // Skip if this URL has already been processed
         if (allowedUrls[urlKey] || blockedUrls[urlKey]) {
@@ -334,13 +334,19 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
             const tabInfo = await new Promise(resolve => {
                 chrome.tabs.get(details.tabId, resolve);
             });
-            referrer = tabInfo.openerTabId ? 
-                (await new Promise(resolve => { 
-                    chrome.tabs.get(tabInfo.openerTabId, info => resolve(info?.url || ''));
-                })) : '';
+            
+            // Get opener tab info if available
+            if (tabInfo.openerTabId) {
+                const openerInfo = await new Promise(resolve => { 
+                    chrome.tabs.get(tabInfo.openerTabId, info => resolve(info || {}));
+                });
+                referrer = openerInfo.url || '';
+            }
         } catch (e) {
             console.error('Error getting referrer:', e);
         }
+        
+        console.log(`Analyzing direct visit: ${url}`, { referrer });
         
         // Analyze this URL
         const serverUrl = 'http://localhost:5000/analyze';
@@ -354,7 +360,8 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
                 domain: domain,
                 context: context,
                 session_id: sessionId,
-                referrer: referrer
+                referrer: referrer,
+                direct_visit: true // Flag to indicate this is a direct visit
             })
         });
         
@@ -364,6 +371,7 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
         }
         
         const result = await response.json();
+        console.log('Direct visit analysis result:', result);
         
         // Store the result in directVisits
         const timestamp = Date.now();
@@ -409,6 +417,19 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
             } catch (e) {
                 console.error('Error blocking tab:', e);
             }
+        } else {
+            // For allowed URLs from direct visits, also store in allowedUrls
+            // This ensures they're counted in the main stats and properly handled if revisited
+            const allowedUrls = urlsData.allowedUrls || {};
+            allowedUrls[urlKey] = {
+                url: url,
+                timestamp: timestamp,
+                reason: result.explanation || 'Content is productive'
+            };
+            
+            await new Promise(resolve => {
+                chrome.storage.local.set({ allowedUrls }, resolve);
+            });
         }
     } catch (error) {
         console.error('Error in navigation event handler:', error);
