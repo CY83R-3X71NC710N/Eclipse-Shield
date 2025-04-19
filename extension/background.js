@@ -294,12 +294,15 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
         const domain = data.domain;
         const context = data.context || [];
         
+        console.log(`Direct navigation detected: ${url}`);
+        
         // Skip chrome:// URLs, chrome-extension:// URLs, and about: URLs
         if (url.startsWith('chrome://') || 
             url.startsWith('chrome-extension://') || 
             url.startsWith('about:') ||
             url.startsWith('file://') ||
             url === 'about:blank') {
+            console.log('Skipping internal browser URL');
             return;
         }
         
@@ -314,14 +317,21 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
         // Create a standardized key for checking
         const urlKey = normalizeUrl(url);
         
-        // Skip if this URL has already been processed
-        if (allowedUrls[urlKey] || blockedUrls[urlKey]) {
+        // Skip if this URL has already been processed - but log it so we can debug
+        if (allowedUrls[urlKey]) {
+            console.log(`URL already in allowed list: ${url}`);
+            return;
+        }
+        
+        if (blockedUrls[urlKey]) {
+            console.log(`URL already in blocked list: ${url}`);
             return;
         }
         
         // Also check if it's already in directVisits
         const directVisits = data.directVisits || {};
         if (directVisits[urlKey]) {
+            console.log(`URL already in direct visits: ${url}`);
             return;
         }
         
@@ -389,18 +399,80 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
             chrome.storage.local.set({ directVisits }, resolve);
         });
         
-        // Send a message to any open popup to refresh
-        chrome.runtime.sendMessage({
-            type: 'URL_ANALYSIS_UPDATE',
-            url: url,
-            action: result.isProductive ? 'allowed' : 'blocked',
-            reason: result.explanation,
-            directVisit: true
-        }).catch(() => {}); // Catch errors if popup isn't open
+        console.log('Saved direct visit to storage:', directVisits[urlKey]);
         
-        // If URL should be blocked, redirect to block page
-        if (!result.isProductive) {
-            // Check if tab still exists and is on the same URL
+        // Now ALWAYS add the site to either allowedUrls or blockedUrls as well
+        // This ensures it shows up in the statistics
+        if (result.isProductive) {
+            // For allowed URLs from direct visits, also store in allowedUrls
+            allowedUrls[urlKey] = {
+                url: url,
+                timestamp: timestamp,
+                reason: result.explanation || 'Content is productive'
+            };
+            
+            await new Promise(resolve => {
+                chrome.storage.local.set({ allowedUrls }, resolve);
+            });
+            
+            console.log('Added direct visit to allowedUrls:', url);
+            
+            // Send update to popup - force this with multiple methods
+            try {
+                // Method 1: Standard message
+                chrome.runtime.sendMessage({
+                    type: 'URL_ANALYSIS_UPDATE',
+                    url: url,
+                    action: 'allowed',
+                    reason: result.explanation,
+                    directVisit: true
+                }).catch(e => console.log('Message send failed (expected if popup not open):', e.message));
+                
+                // Method 2: Also send URL_ALLOWED message like from block.js
+                chrome.runtime.sendMessage({
+                    type: 'URL_ALLOWED',
+                    url: url,
+                    reason: result.explanation
+                }).catch(e => console.log('URL_ALLOWED message failed (expected if popup not open):', e.message));
+            } catch (e) {
+                console.log('Error sending messages to popup (this is normal if popup is not open):', e);
+            }
+        } else {
+            // For blocked URLs, add to blockedUrls
+            blockedUrls[urlKey] = {
+                url: url,
+                timestamp: timestamp,
+                reason: result.explanation || 'Not relevant to current task'
+            };
+            
+            await new Promise(resolve => {
+                chrome.storage.local.set({ blockedUrls }, resolve);
+            });
+            
+            console.log('Added direct visit to blockedUrls:', url);
+            
+            // Send update to popup
+            try {
+                // Method 1: Standard message
+                chrome.runtime.sendMessage({
+                    type: 'URL_ANALYSIS_UPDATE',
+                    url: url,
+                    action: 'blocked',
+                    reason: result.explanation,
+                    directVisit: true
+                }).catch(e => console.log('Message send failed (expected if popup not open):', e.message));
+                
+                // Method 2: Also send URL_BLOCKED message like from block.js
+                chrome.runtime.sendMessage({
+                    type: 'URL_BLOCKED',
+                    url: url,
+                    reason: result.explanation
+                }).catch(e => console.log('URL_BLOCKED message failed (expected if popup not open):', e.message));
+            } catch (e) {
+                console.log('Error sending messages to popup (this is normal if popup is not open):', e);
+            }
+            
+            // If URL should be blocked, redirect to block page
             try {
                 const tab = await new Promise(resolve => {
                     chrome.tabs.get(details.tabId, resolve);
@@ -417,19 +489,6 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
             } catch (e) {
                 console.error('Error blocking tab:', e);
             }
-        } else {
-            // For allowed URLs from direct visits, also store in allowedUrls
-            // This ensures they're counted in the main stats and properly handled if revisited
-            const allowedUrls = urlsData.allowedUrls || {};
-            allowedUrls[urlKey] = {
-                url: url,
-                timestamp: timestamp,
-                reason: result.explanation || 'Content is productive'
-            };
-            
-            await new Promise(resolve => {
-                chrome.storage.local.set({ allowedUrls }, resolve);
-            });
         }
     } catch (error) {
         console.error('Error in navigation event handler:', error);

@@ -48,15 +48,18 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Initialize by checking storage
-    chromeStorage.get(['formState', 'blockedUrls', 'allowedUrls']).then(data => {
+    chromeStorage.get(['formState', 'blockedUrls', 'allowedUrls', 'directVisits']).then(data => {
         console.log('Initial storage and form state:', data);
         if (data.formState) {
             storageState = {...storageState, ...data.formState};
             restoreFormState();
         }
         
-        // Update analysis stats
+        // Update analysis stats with all data types
         updateAnalysisStats(data);
+        
+        // Force refresh of analysis display
+        updateAnalysisUI();
     }).catch(err => {
         console.error('Storage access error:', err);
     });
