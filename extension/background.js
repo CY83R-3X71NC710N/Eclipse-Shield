@@ -275,3 +275,142 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true;
     }
 });
+
+// Listen for web navigation events to capture direct visits
+chrome.webNavigation.onCompleted.addListener(async (details) => {
+    // Only care about main frame navigations (not iframes, etc)
+    if (details.frameId !== 0) return;
+    
+    try {
+        // Get the current session data
+        const data = await new Promise(resolve => {
+            chrome.storage.local.get(['sessionData', 'domain', 'context', 'directVisits'], resolve);
+        });
+        
+        // Skip if there's no active session
+        if (!data.sessionData || !data.domain) return;
+        
+        const url = details.url;
+        const domain = data.domain;
+        const context = data.context || [];
+        
+        // Skip chrome:// URLs, chrome-extension:// URLs, and about: URLs
+        if (url.startsWith('chrome://') || 
+            url.startsWith('chrome-extension://') || 
+            url.startsWith('about:') ||
+            url.startsWith('file://') ||
+            url === 'about:blank') {
+            return;
+        }
+        
+        // Skip URLs we've already analyzed (in allowed or blocked lists)
+        const urlsData = await new Promise(resolve => {
+            chrome.storage.local.get(['allowedUrls', 'blockedUrls'], resolve);
+        });
+        
+        const allowedUrls = urlsData.allowedUrls || {};
+        const blockedUrls = urlsData.blockedUrls || {};
+        
+        // Create a standardized key for checking
+        const urlKey = new URL(url).href;
+        
+        // Skip if this URL has already been processed
+        if (allowedUrls[urlKey] || blockedUrls[urlKey]) {
+            return;
+        }
+        
+        // Also check if it's already in directVisits
+        const directVisits = data.directVisits || {};
+        if (directVisits[urlKey]) {
+            return;
+        }
+        
+        // Create a session ID for consistent caching
+        const sessionId = data.sessionData.startTime.toString();
+        
+        // Get the referrer which can help detect search engine clicks
+        let referrer = '';
+        try {
+            const tabInfo = await new Promise(resolve => {
+                chrome.tabs.get(details.tabId, resolve);
+            });
+            referrer = tabInfo.openerTabId ? 
+                (await new Promise(resolve => { 
+                    chrome.tabs.get(tabInfo.openerTabId, info => resolve(info?.url || ''));
+                })) : '';
+        } catch (e) {
+            console.error('Error getting referrer:', e);
+        }
+        
+        // Analyze this URL
+        const serverUrl = 'http://localhost:5000/analyze';
+        const response = await fetch(serverUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                url: url,
+                domain: domain,
+                context: context,
+                session_id: sessionId,
+                referrer: referrer
+            })
+        });
+        
+        if (!response.ok) {
+            console.error(`Server returned ${response.status} ${response.statusText}`);
+            return;
+        }
+        
+        const result = await response.json();
+        
+        // Store the result in directVisits
+        const timestamp = Date.now();
+        directVisits[urlKey] = {
+            url: url,
+            timestamp: timestamp,
+            isProductive: result.isProductive,
+            explanation: result.explanation,
+            confidence: result.confidence,
+            reason: result.explanation
+        };
+        
+        // Update storage with new direct visit
+        await new Promise(resolve => {
+            chrome.storage.local.set({ directVisits }, resolve);
+        });
+        
+        // Send a message to any open popup to refresh
+        chrome.runtime.sendMessage({
+            type: 'URL_ANALYSIS_UPDATE',
+            url: url,
+            action: result.isProductive ? 'allowed' : 'blocked',
+            reason: result.explanation,
+            directVisit: true
+        }).catch(() => {}); // Catch errors if popup isn't open
+        
+        // If URL should be blocked, redirect to block page
+        if (!result.isProductive) {
+            // Check if tab still exists and is on the same URL
+            try {
+                const tab = await new Promise(resolve => {
+                    chrome.tabs.get(details.tabId, resolve);
+                });
+                
+                if (tab && tab.url === url) {
+                    const blockUrl = chrome.runtime.getURL('block.html') + 
+                        `?url=${encodeURIComponent(url)}` +
+                        `&reason=${encodeURIComponent(result.explanation)}` +
+                        `&original_url=${encodeURIComponent(url)}`;
+                    
+                    chrome.tabs.update(details.tabId, { url: blockUrl });
+                }
+            } catch (e) {
+                console.error('Error blocking tab:', e);
+            }
+        }
+    } catch (error) {
+        console.error('Error in navigation event handler:', error);
+    }
+});

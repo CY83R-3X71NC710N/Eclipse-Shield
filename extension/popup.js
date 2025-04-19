@@ -120,101 +120,118 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>`;
                 
-            // Add latest activity if available - improved check to verify lastUrl has content
-            if (stats.lastUrl && stats.lastUrl.trim() !== '') {
-                console.log('Found last URL activity:', stats.lastUrl, stats.lastAction);
-                const actionClass = stats.lastAction === 'blocked' ? 'blocked' : 'allowed';
-                statusHtml += `
-                    <div class="latest-activity">
-                        <h4>LATEST ACTIVITY</h4>
-                        <div class="activity-item ${actionClass}">
-                            <div class="activity-url">${stats.lastUrl}</div>
-                            <div class="activity-status ${actionClass}">${stats.lastAction.toUpperCase()}</div>
-                            ${stats.lastReason ? `<div class="activity-reason">${stats.lastReason}</div>` : ''}
-                        </div>
-                    </div>`;
-            } else {
-                // Debug log to understand why we're showing "no sites" message
-                console.log('No last URL activity found in state:', stats);
+            // Always retrieve recent URLs from storage to show the most recent one
+            chromeStorage.get(['blockedUrls', 'allowedUrls', 'directVisits']).then(urlData => {
+                let latestUrl = '';
+                let latestTimestamp = 0;
+                let action = '';
+                let reason = '';
                 
-                // Only show "No sites visited" if totalSites is actually 0
-                if (stats.totalSites === 0) {
-                    statusHtml += `
-                        <div class="latest-activity">
-                            <h4>LATEST ACTIVITY</h4>
-                            <div class="activity-item neutral">
-                                <div class="activity-status">No sites visited yet</div>
-                                <div class="activity-info">Your browsing statistics will appear here</div>
-                            </div>
+                // Check blocked URLs for most recent
+                if (urlData.blockedUrls) {
+                    Object.entries(urlData.blockedUrls).forEach(([url, data]) => {
+                        if (data.timestamp && data.timestamp > latestTimestamp) {
+                            latestUrl = data.url || url;
+                            latestTimestamp = data.timestamp;
+                            action = 'blocked';
+                            reason = data.reason || '';
+                        }
+                    });
+                }
+                
+                // Check allowed URLs for most recent
+                if (urlData.allowedUrls) {
+                    Object.entries(urlData.allowedUrls).forEach(([url, data]) => {
+                        if (data.timestamp && data.timestamp > latestTimestamp) {
+                            latestUrl = data.url || url;
+                            latestTimestamp = data.timestamp;
+                            action = 'allowed';
+                            reason = data.reason || '';
+                        }
+                    });
+                }
+                
+                // Check direct visits for most recent - new addition
+                if (urlData.directVisits) {
+                    Object.entries(urlData.directVisits).forEach(([url, data]) => {
+                        if (data.timestamp && data.timestamp > latestTimestamp) {
+                            latestUrl = data.url || url;
+                            latestTimestamp = data.timestamp;
+                            action = data.isProductive ? 'allowed' : 'blocked';
+                            reason = data.reason || '';
+                        }
+                    });
+                }
+                
+                // Based on what we found, update the UI appropriately
+                let activityHtml = `
+                    <div class="latest-activity">
+                        <h4>LATEST ACTIVITY</h4>`;
+                
+                if (latestUrl) {
+                    const actionClass = action === 'blocked' ? 'blocked' : 'allowed';
+                    activityHtml += `
+                        <div class="activity-item ${actionClass}">
+                            <div class="activity-url">${latestUrl}</div>
+                            <div class="activity-status ${actionClass}">${action.toUpperCase()}</div>
+                            ${reason ? `<div class="activity-reason">${reason}</div>` : ''}
+                        </div>`;
+                    
+                    // Update state with this latest activity
+                    storageState.analysisStatus.lastUrl = latestUrl;
+                    storageState.analysisStatus.lastAction = action;
+                    storageState.analysisStatus.lastReason = reason;
+                } else if (stats.totalSites === 0) {
+                    activityHtml += `
+                        <div class="activity-item neutral">
+                            <div class="activity-status">No sites visited yet</div>
+                            <div class="activity-info">Your browsing statistics will appear here</div>
                         </div>`;
                 } else {
-                    // Get recent URLs from storage to show the most recent one
-                    chromeStorage.get(['blockedUrls', 'allowedUrls']).then(urlData => {
-                        let latestUrl = '';
-                        let latestTimestamp = 0;
-                        let action = '';
-                        let reason = '';
-                        
-                        // Check blocked URLs for most recent
-                        if (urlData.blockedUrls) {
-                            Object.entries(urlData.blockedUrls).forEach(([url, data]) => {
-                                if (data.timestamp && data.timestamp > latestTimestamp) {
-                                    latestUrl = data.url || url;
-                                    latestTimestamp = data.timestamp;
-                                    action = 'blocked';
-                                    reason = data.reason || '';
-                                }
-                            });
-                        }
-                        
-                        // Check allowed URLs for most recent
-                        if (urlData.allowedUrls) {
-                            Object.entries(urlData.allowedUrls).forEach(([url, data]) => {
-                                if (data.timestamp && data.timestamp > latestTimestamp) {
-                                    latestUrl = data.url || url;
-                                    latestTimestamp = data.timestamp;
-                                    action = 'allowed';
-                                    reason = data.reason || '';
-                                }
-                            });
-                        }
-                        
-                        // Update the status HTML with grammatically correct text and URL if available
-                        const siteText = stats.totalSites === 1 ? 'site has' : 'sites have';
-                        let activityHtml = `
-                            <div class="latest-activity">
-                                <h4>LATEST ACTIVITY</h4>
-                                <div class="activity-item neutral">
-                                    <div class="activity-status">Site activity detected</div>
-                                    <div class="activity-info">${stats.totalSites} ${siteText} been analyzed</div>`;
-                        
-                        // Add URL info if available
-                        if (latestUrl) {
-                            const actionClass = action === 'blocked' ? 'blocked' : 'allowed';
-                            activityHtml += `
-                                    <div class="activity-url">Most recent: ${latestUrl}</div>
-                                    <div class="activity-status ${actionClass}">${action.toUpperCase()}</div>
-                                    ${reason ? `<div class="activity-reason">${reason}</div>` : ''}`;
-                        }
-                        
-                        activityHtml += `
-                                </div>
-                            </div>`;
+                    // Should rarely happen - have stats but can't find latest activity
+                    const siteText = stats.totalSites === 1 ? 'site has' : 'sites have';
+                    activityHtml += `
+                        <div class="activity-item neutral">
+                            <div class="activity-status">Site activity detected</div>
+                            <div class="activity-info">${stats.totalSites} ${siteText} been analyzed</div>
+                        </div>`;
+                }
+                
+                activityHtml += `</div>`;
                             
-                        // Append to status HTML
-                        resultDiv.innerHTML = statusHtml + activityHtml;
-                        
-                        // If we have session data, add that too
-                        addSessionInfo(resultDiv, statusHtml + activityHtml);
+                // Add session info with combined HTML
+                addSessionInfo(resultDiv, statusHtml + activityHtml);
+                
+                // Also update total counts based on direct visits
+                if (urlData.directVisits) {
+                    let allowedFromDirect = 0;
+                    let blockedFromDirect = 0;
+                    
+                    Object.values(urlData.directVisits).forEach(data => {
+                        if (data.isProductive) {
+                            allowedFromDirect++;
+                        } else {
+                            blockedFromDirect++;
+                        }
                     });
                     
-                    // Return here since we're handling the UI update in the promise
-                    return;
+                    // Update the stats in the UI if there's anything to update
+                    if (allowedFromDirect > 0 || blockedFromDirect > 0) {
+                        const totalSitesElem = resultDiv.querySelector('.stat-value:nth-child(1)');
+                        const allowedSitesElem = resultDiv.querySelector('.stat-value.allowed');
+                        const blockedSitesElem = resultDiv.querySelector('.stat-value.blocked');
+                        
+                        if (totalSitesElem) totalSitesElem.textContent = (stats.totalSites + allowedFromDirect + blockedFromDirect);
+                        if (allowedSitesElem) allowedSitesElem.textContent = (stats.allowedSites + allowedFromDirect);
+                        if (blockedSitesElem) blockedSitesElem.textContent = (stats.blockedSites + blockedFromDirect);
+                        
+                        // Also update our state
+                        storageState.analysisStatus.totalSites = stats.totalSites + allowedFromDirect + blockedFromDirect;
+                        storageState.analysisStatus.allowedSites = stats.allowedSites + allowedFromDirect;
+                        storageState.analysisStatus.blockedSites = stats.blockedSites + blockedFromDirect;
+                    }
                 }
-            }
-            
-            // Add session info
-            addSessionInfo(resultDiv, statusHtml);
+            });
         }
     }
     

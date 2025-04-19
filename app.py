@@ -153,6 +153,7 @@ def analyze():
         domain = data.get('domain')
         context = data.get('context', [])
         session_id = data.get('session_id')  # Get session ID from request
+        referrer = data.get('referrer')  # Get the referrer info for direct visits
 
         if not url or not domain:
             return jsonify({'error': 'Missing required fields'}), 400
@@ -196,9 +197,41 @@ def analyze():
         logger.info(f"Set analyzer context to: {context_dict}")
 
         try:
+            # Additional search signals to add if this is a direct visit with referrer
+            additional_signals = {}
+            
+            # Check if referrer is a search engine and extract useful information
+            if referrer:
+                logger.debug(f"Processing referrer information: {referrer}")
+                parsed_referrer = urlparse(referrer)
+                
+                # Check for common search engines
+                if any(search_domain in parsed_referrer.netloc.lower() for search_domain in 
+                       ['google.com', 'bing.com', 'duckduckgo.com', 'yahoo.com', 'brave.com']):
+                    additional_signals['from_search_engine'] = True
+                    additional_signals['search_engine'] = parsed_referrer.netloc
+                    
+                    # Try to extract search query from referrer URL
+                    query_params = parsed_referrer.query.split('&')
+                    for param in query_params:
+                        if '=' in param:
+                            key, value = param.split('=', 1)
+                            # Common search query parameter names
+                            if key.lower() in ['q', 'query', 'p', 'text', 'search']:
+                                from urllib.parse import unquote_plus
+                                additional_signals['search_query'] = unquote_plus(value)
+                                logger.debug(f"Extracted search query: {additional_signals['search_query']}")
+                                break
+            
             is_productive = analyzer.analyze_website(url, domain)
             url_signals = analyzer._analyze_url_components(url)
-            context_relevance = analyzer._check_context_relevance(url, url_signals.get('search_query'))
+            
+            # Merge additional signals from referrer if present
+            if additional_signals:
+                url_signals.update(additional_signals)
+                logger.debug(f"Enhanced URL signals with referrer data: {url_signals}")
+            
+            context_relevance = analyzer._check_context_relevance(url, url_signals)
 
             result = {
                 'isProductive': bool(is_productive),
@@ -206,7 +239,8 @@ def analyze():
                 'confidence': get_confidence_score(url_signals, context_relevance),
                 'signals': url_signals,
                 'context_relevance': context_relevance,
-                'context_used': context_dict  # Add this for debugging
+                'context_used': context_dict,  # Add this for debugging
+                'referrer_data': additional_signals if additional_signals else None  # Include referrer analysis
             }
 
             # Store result in cache with timestamp and session ID
