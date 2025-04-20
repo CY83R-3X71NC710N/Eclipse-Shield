@@ -231,7 +231,30 @@ async function updateTimer() {
 }
 
 // Add cursor handling
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Check for active session first
+    try {
+        const { sessionData } = await chrome.storage.local.get('sessionData');
+        if (!sessionData || sessionData.state !== 'active') {
+            console.log('Newtab: No active session, redirecting to block page.');
+            // Redirect to the block page with reason=no-session
+            // Use chrome.tabs.update to change the current tab's URL
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                if (tabs[0]) {
+                    chrome.tabs.update(tabs[0].id, { 
+                        url: chrome.runtime.getURL('block.html') + '?reason=no-session' 
+                    });
+                }
+            });
+            return; // Stop executing the rest of newtab.js
+        }
+        console.log('Newtab: Active session found, proceeding.');
+    } catch (error) {
+        console.error('Error checking session state in newtab:', error);
+        // Optionally redirect to block page on error too?
+        // For now, log the error and potentially let it load partially or show an error.
+    }
+
     const cursor = document.querySelector('.custom-cursor');
     const ring = document.querySelector('.cursor-ring');
     const dot = document.querySelector('.cursor-dot');

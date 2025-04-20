@@ -101,16 +101,27 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
             tab.url.startsWith('about') || 
             tab.url.startsWith('edge') ||
             tab.url.includes('localhost:5000')) {
+            console.log('Skipping internal/dev URL:', tab.url);
             return;
         }
         
-        // Only proceed if we have an active session
+        // Check for active session FIRST
         const { sessionData } = await chrome.storage.local.get('sessionData');
         if (!sessionData || sessionData.state !== 'active') {
-            console.log('No active session, skipping URL monitoring');
-            return;
+            // No active session, block the site if it's not already the block page
+            if (!isBlockPage(tab.url)) {
+                console.log('No active session, blocking URL:', tab.url);
+                await chrome.tabs.update(tabId, {
+                    url: chrome.runtime.getURL('block.html') + 
+                        '?reason=no-session' +
+                        `&url=${encodeURIComponent(tab.url)}` + // Pass the blocked URL
+                        `&original_url=${encodeURIComponent(tab.url)}` // Pass original URL
+                });
+            }
+            return; // Stop further processing if no active session
         }
 
+        // --- Active Session Logic ---
         // Process URLs that aren't our block page
         if (!isBlockPage(tab.url)) {
             const normalizedUrl = normalizeUrl(tab.url);
@@ -118,7 +129,6 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
             
             // Check if URL has already been analyzed
             const urlKey = normalizedUrl;
-            
             if (blockedUrls && blockedUrls[urlKey]) {
                 console.log('URL is blocked:', tab.url);
                 
@@ -128,9 +138,10 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
                     url: tab.url,
                     action: 'blocked',
                     reason: blockedUrls[urlKey].reason
-                });
+                }).catch(e => console.log('Message send failed (expected if popup not open):', e.message));
                 
-                if (!isBlockPage(tab.url) || getBlockPageReason(tab.url) !== 'blocked') {
+                // Redirect to block page if not already there with the correct reason
+                if (getBlockPageReason(tab.url) !== 'blocked') {
                     await chrome.tabs.update(tabId, {
                         url: chrome.runtime.getURL('block.html') + 
                             '?reason=blocked' +
@@ -146,6 +157,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
             // Only analyze if URL isn't being processed and isn't already allowed
             if (!activeUrls.has(tab.url) && (!allowedUrls || !allowedUrls[urlKey])) {
                 activeUrls.add(tab.url);
+                console.log('Redirecting to analysis page for:', tab.url);
                 await chrome.tabs.update(tabId, {
                     url: chrome.runtime.getURL('block.html') + 
                         '?reason=analyzing' +
@@ -156,23 +168,271 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
                 });
             } else if (allowedUrls && allowedUrls[urlKey]) {
                 // URL is already allowed, just send update to popup
+                console.log('URL already allowed:', tab.url);
                 chrome.runtime.sendMessage({
                     type: 'URL_ANALYSIS_UPDATE',
                     url: tab.url,
                     action: 'allowed',
                     reason: allowedUrls[urlKey].reason || 'Content is productive'
-                });
+                }).catch(e => console.log('Message send failed (expected if popup not open):', e.message));
             }
 
         } else {
             // This is our block page - we're already handling this URL
             console.log('Block page detected:', tab.url);
+            // Ensure the correct section is shown based on the reason
+            const reason = getBlockPageReason(tab.url);
+            if (reason === 'no-session' && sessionData && sessionData.state === 'active') {
+                // If session became active while on no-session block page, redirect back
+                const params = new URLSearchParams(new URL(tab.url).search);
+                const originalUrl = params.get('original_url');
+                if (originalUrl) {
+                    console.log('Session now active, redirecting from no-session block page to:', originalUrl);
+                    await chrome.tabs.update(tabId, { url: originalUrl });
+                }
+            }
         }
 
     } catch (error) {
         console.error('Error in tabs.onUpdated listener:', error);
     }
 });
+
+// Handle direct navigation (typing URL, bookmarks, etc.)
+chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
+    // Ignore subframe navigation and non-http(s) protocols
+    if (details.frameId !== 0 || !details.url.startsWith('http')) {
+        return;
+    }
+
+    try {
+        const data = await new Promise(resolve => {
+            chrome.storage.local.get(['sessionData', 'blockedUrls', 'allowedUrls', 'directVisits'], resolve);
+        });
+
+        // Check for active session FIRST
+        if (!data.sessionData || data.sessionData.state !== 'active') {
+            // No active session, block the site if it's not the block page
+            if (!isBlockPage(details.url)) {
+                console.log('No active session, blocking direct navigation:', details.url);
+                chrome.tabs.update(details.tabId, {
+                    url: chrome.runtime.getURL('block.html') + 
+                        '?reason=no-session' +
+                        `&url=${encodeURIComponent(details.url)}` +
+                        `&original_url=${encodeURIComponent(details.url)}`
+                });
+            }
+            return; // Stop further processing if no active session
+        }
+
+        // --- Active Session Logic ---
+        const { sessionData, domain, context, blockedUrls = {}, allowedUrls = {}, directVisits = {} } = data;
+        
+        console.log(`Direct navigation detected: ${details.url}`);
+        
+        // Skip chrome:// URLs, chrome-extension:// URLs, and about: URLs
+        if (details.url.startsWith('chrome://') || 
+            details.url.startsWith('chrome-extension://') || 
+            details.url.startsWith('about:') ||
+            details.url.startsWith('file://') ||
+            details.url === 'about:blank' ||
+            details.url.includes('localhost:5000')) {
+            console.log('Skipping internal/dev URL');
+            return;
+        }
+        
+        // Create a standardized key for checking
+        const urlKey = normalizeUrl(details.url);
+        
+        // Skip if this URL has already been processed (allowed, blocked, or direct visit analyzed)
+        if (allowedUrls[urlKey] || blockedUrls[urlKey] || directVisits[urlKey]) {
+            console.log(`URL already processed: ${details.url}`);
+            // Send update to popup if needed (e.g., for stats)
+            let updateData = {};
+            if (allowedUrls[urlKey]) updateData = { action: 'allowed', reason: allowedUrls[urlKey].reason };
+            else if (blockedUrls[urlKey]) updateData = { action: 'blocked', reason: blockedUrls[urlKey].reason };
+            else if (directVisits[urlKey]) updateData = { action: directVisits[urlKey].isProductive ? 'allowed' : 'blocked', reason: directVisits[urlKey].reason, directVisit: true };
+            
+            if (updateData.action) {
+                 chrome.runtime.sendMessage({
+                    type: 'URL_ANALYSIS_UPDATE',
+                    url: details.url,
+                    ...updateData
+                }).catch(e => console.log('Message send failed (expected if popup not open):', e.message));
+            }
+            return;
+        }
+        
+        // Create a session ID for consistent caching
+        const sessionId = sessionData.startTime.toString();
+        
+        // Get the referrer which can help detect search engine clicks
+        let referrer = '';
+        try {
+            const tabInfo = await new Promise(resolve => {
+                chrome.tabs.get(details.tabId, resolve);
+            });
+            
+            // Get opener tab info if available
+            if (tabInfo.openerTabId) {
+                const openerInfo = await new Promise(resolve => { 
+                    chrome.tabs.get(tabInfo.openerTabId, info => resolve(info || {}));
+                });
+                referrer = openerInfo.url || '';
+            } else {
+                 // For direct navigation, referrer might be empty or less useful
+                 // We might rely more on the absence of a typical referrer (like a search engine)
+                 referrer = details.transitionQualifiers?.includes('from_address_bar') ? 'address_bar' : '';
+            }
+            console.log(`Referrer for ${details.url}: ${referrer}`);
+        } catch (e) {
+            console.error('Error getting referrer:', e);
+        }
+
+        // Check if it's likely a search engine result click
+        const isLikelySearchClick = referrer && (
+            referrer.includes('google.com/search') ||
+            referrer.includes('bing.com/search') ||
+            referrer.includes('duckduckgo.com') ||
+            referrer.includes('brave.com/search') // Added Brave Search
+        );
+
+        if (isLikelySearchClick) {
+            console.log('Likely search click, letting onUpdated handle analysis:', details.url);
+            // Let the onUpdated listener handle analysis via the block page redirection
+            // This ensures consistent analysis flow
+            return; 
+        }
+
+        // If not a search click, treat as direct visit and analyze directly
+        console.log('Analyzing direct visit:', details.url);
+        const url = details.url;
+        const timestamp = Date.now();
+
+        // Call backend for analysis
+        const response = await fetch('http://localhost:5000/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                url: url,
+                domain: sessionData.domain,
+                context: sessionData.context || [],
+                session_id: sessionId,
+                is_direct_visit: true // Indicate direct visit
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        console.log('Direct visit analysis result:', result);
+
+        // Store result in directVisits
+        directVisits[urlKey] = {
+            url: url,
+            timestamp: timestamp,
+            isProductive: result.isProductive,
+            reason: result.explanation || (result.isProductive ? 'Direct visit allowed' : 'Direct visit blocked')
+        };
+        await new Promise(resolve => {
+            chrome.storage.local.set({ directVisits }, resolve);
+        });
+        console.log('Added direct visit analysis result to storage:', urlKey);
+
+
+        // Handle result: Allow or Block
+        if (result.isProductive) {
+            // For allowed URLs, add to allowedUrls as well for consistency?
+            // Or keep separate? Keeping separate for now to distinguish direct visits.
+            allowedUrls[urlKey] = { // Add to allowedUrls too for faster checks later
+                 url: url,
+                 timestamp: timestamp,
+                 reason: result.explanation || 'Direct visit allowed'
+            };
+            await new Promise(resolve => {
+                chrome.storage.local.set({ allowedUrls }, resolve);
+            });
+            console.log('Added direct visit to allowedUrls:', url);
+            
+            // Send update to popup
+            try {
+                // Method 1: Standard message
+                chrome.runtime.sendMessage({
+                    type: 'URL_ANALYSIS_UPDATE',
+                    url: url,
+                    action: 'allowed',
+                    reason: result.explanation,
+                    directVisit: true
+                }).catch(e => console.log('Message send failed (expected if popup not open):', e.message));
+                
+                // Method 2: Also send URL_ALLOWED message like from block.js
+                chrome.runtime.sendMessage({
+                    type: 'URL_ALLOWED',
+                    url: url,
+                    reason: result.explanation
+                }).catch(e => console.log('URL_ALLOWED message failed (expected if popup not open):', e.message));
+            } catch (e) {
+                console.log('Error sending messages to popup (this is normal if popup is not open):', e);
+            }
+        } else {
+            // For blocked URLs, add to blockedUrls
+            blockedUrls[urlKey] = {
+                url: url,
+                timestamp: timestamp,
+                reason: result.explanation || 'Not relevant to current task'
+            };
+            
+            await new Promise(resolve => {
+                chrome.storage.local.set({ blockedUrls }, resolve);
+            });
+            console.log('Added direct visit to blockedUrls:', url);
+            
+            // Send update to popup
+            try {
+                // Method 1: Standard message
+                chrome.runtime.sendMessage({
+                    type: 'URL_ANALYSIS_UPDATE',
+                    url: url,
+                    action: 'blocked',
+                    reason: result.explanation,
+                    directVisit: true
+                }).catch(e => console.log('Message send failed (expected if popup not open):', e.message));
+                
+                // Method 2: Also send URL_BLOCKED message like from block.js
+                chrome.runtime.sendMessage({
+                    type: 'URL_BLOCKED',
+                    url: url,
+                    reason: result.explanation
+                }).catch(e => console.log('URL_BLOCKED message failed (expected if popup not open):', e.message));
+            } catch (e) {
+                console.log('Error sending messages to popup (this is normal if popup is not open):', e);
+            }
+            
+            // If URL should be blocked, redirect to block page
+            try {
+                const tab = await new Promise(resolve => {
+                    chrome.tabs.get(details.tabId, resolve);
+                });
+                // Check if the tab still exists and the URL hasn't changed
+                if (tab && tab.url === url) {
+                    const blockUrl = chrome.runtime.getURL('block.html') + 
+                        `?reason=blocked` + // Use 'blocked' reason
+                        `&url=${encodeURIComponent(url)}` +
+                        `&original_url=${encodeURIComponent(url)}` +
+                        `&explanation=${encodeURIComponent(result.explanation || 'Direct visit blocked')}`;
+                    
+                    chrome.tabs.update(details.tabId, { url: blockUrl });
+                }
+            } catch (e) {
+                console.error('Error blocking tab:', e);
+            }
+        }
+    } catch (error) {
+        console.error('Error in navigation event handler:', error);
+    }
+}, { url: [{ schemes: ["http", "https"] }] }); // Only listen for http/https
 
 // Add URL analysis result handler
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
