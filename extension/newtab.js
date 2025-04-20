@@ -301,8 +301,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 miniRipple.style.transform = 'translate(-50%, -50%)';
                 document.body.appendChild(miniRipple);
                 
-                miniRipple.addEventListener('animationend', () => miniRipple.remove();
-                });
+                miniRipple.addEventListener('animationend', () => miniRipple.remove());
             }, i * 100);
         }
 

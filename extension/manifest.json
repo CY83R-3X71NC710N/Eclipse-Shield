@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Productivity Analyzer",
+  "name": "Eclipse Shield",
   "version": "1.0",
   "permissions": [
     "activeTab",
@@ -15,8 +15,7 @@
     "default_height": 800
   },
   "background": {
-    "service_worker": "background.js",
-    "type": "module"
+    "service_worker": "background.js"
   },
   "host_permissions": [
     "*://*/*",
