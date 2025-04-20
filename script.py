@@ -553,26 +553,32 @@ class ProductivityAnalyzer:
         # Default if no specific category matches
         return 'general'
 
-    def analyze_website(self, url: str, domain: str) -> bool:
-        """Analyze if a website is productive based on domain settings, context, and AI."""
+    def analyze_website(self, url: str, domain: str) -> dict: # Return dict now
+        """Analyze if a website is productive based on domain settings, context, and AI.
+
+        Returns:
+            dict: {'isProductive': bool, 'explanation': str, 'confidence': float (optional)}
+        """
         logger.debug(f"analyze_website - START - URL: {url}, Domain: {domain}")
 
         # --- Initial Checks ---
         base_domain = self._get_domain_from_url(url)
         if not base_domain:
             logger.warning(f"analyze_website - Cannot analyze URL without a valid domain: {url}")
-            return False # Cannot be productive if URL is invalid
+            # Cannot be productive if URL is invalid
+            return {'isProductive': False, 'explanation': 'Invalid URL format.'}
 
         if domain not in self.settings.get("domains", {}):
             logger.error(f"analyze_website - Domain '{domain}' configuration not found in settings.")
-            return False # Cannot analyze without domain settings
+            # Cannot analyze without domain settings
+            return {'isProductive': False, 'explanation': f"Configuration for domain '{domain}' not found."}
 
         settings = self.settings["domains"][domain]
 
         # --- 1. Check Explicitly Allowed Platforms ---
         if self._is_allowed_platform(url, domain):
             logger.info(f"analyze_website - ALLOWED: URL '{url}' matches an allowed platform for domain '{domain}'.")
-            return True
+            return {'isProductive': True, 'explanation': f"Allowed platform for '{domain}' domain."}
 
         # --- 2. Check Explicitly Blocked Specific URLs/Domains ---
         blocked_specific = settings.get("blocked_specific", [])
@@ -582,7 +588,7 @@ class ProductivityAnalyzer:
                 # Check if the blocked rule matches the base domain or the full URL
                 if base_domain.endswith(blocked.lower()) or url.lower() == blocked.lower():
                     logger.info(f"analyze_website - BLOCKED: URL '{url}' matches blocked specific rule '{blocked}' for domain '{domain}'.")
-                    return False
+                    return {'isProductive': False, 'explanation': f"Blocked specific rule: '{blocked}'."}
         else:
             logger.warning(f"analyze_website - 'blocked_specific' is not a list for domain '{domain}'.")
 
@@ -594,13 +600,14 @@ class ProductivityAnalyzer:
                 if not isinstance(keyword, str): continue
                 if keyword.lower() in url_lower:
                     logger.info(f"analyze_website - BLOCKED: URL '{url}' contains blocked keyword '{keyword}' for domain '{domain}'.")
-                    return False
+                    return {'isProductive': False, 'explanation': f"Blocked keyword found: '{keyword}'."}
         else:
             logger.warning(f"analyze_website - 'blocked_keywords' is not a list for domain '{domain}'.")
 
 
         # --- 4. Contextual Analysis (if applicable) ---
         contextualization_required = settings.get("contextualization_required", domain == "personal") # Default to True for personal
+        # Context check runs if required AND context data exists
         run_context_check = contextualization_required and self.context_data
 
         context_relevance = {'score': 0.0} # Default score if no context check
@@ -611,9 +618,11 @@ class ProductivityAnalyzer:
             logger.debug(f"analyze_website - Context relevance result: {context_relevance}")
 
             # Decision based on high context relevance
-            if context_relevance.get('score', 0.7) > 0.7:
-                logger.info(f"analyze_website - ALLOWED: High context relevance ({context_relevance['score']}) for URL '{url}'.")
-                return True
+            if context_relevance.get('score', 0.0) > 0.7: # Ensure default is 0.0 for comparison
+                matched_terms_str = ', '.join(context_relevance.get('matched_terms',[]))
+                explanation = f"High context relevance ({context_relevance['score']}). Matched: {matched_terms_str}"
+                logger.info(f"analyze_website - ALLOWED: {explanation} for URL '{url}'.")
+                return {'isProductive': True, 'explanation': explanation}
 
         # --- 5. AI Analysis (Borderline Cases or when context is insufficient) ---
         # Condition to use AI:
@@ -629,7 +638,13 @@ class ProductivityAnalyzer:
             try:
                 context_summary = "No specific task context provided."
                 if self.context_data:
-                     context_summary = json.dumps(self.context_data, indent=2)
+                     # Ensure context_data is serializable (it should be dict)
+                     try:
+                         context_summary = json.dumps(self.context_data, indent=2)
+                     except TypeError as json_err:
+                         logger.error(f"analyze_website - Context data not JSON serializable: {json_err}")
+                         context_summary = "Error: Context data could not be formatted."
+
 
                 # Prepare detailed prompt for AI
                 analysis_prompt = f"""Analyze if visiting this URL is productive for the user in the '{domain}' domain, considering their current task context (if provided).
@@ -685,24 +700,27 @@ class ProductivityAnalyzer:
                     if verdict == 'ALLOW':
                         logger.info(f"analyze_website - AI Verdict: ALLOW. Reason: {explanation}")
                         # Log additional details for successful analysis that might be useful for debugging direct visits
-                        logger.info(f"analyze_website - DIRECT VISIT ALLOWED: URL={url}, DOMAIN={domain}, EXPLANATION={explanation}")
-                        return True
+                        logger.info(f"analyze_website - AI ALLOWED: URL={url}, DOMAIN={domain}, EXPLANATION={explanation}")
+                        return {'isProductive': True, 'explanation': explanation} # Return dict
                     elif verdict == 'BLOCK':
                         logger.info(f"analyze_website - AI Verdict: BLOCK. Reason: {explanation}")
                         # Log additional details for unsuccessful analysis
-                        logger.info(f"analyze_website - DIRECT VISIT BLOCKED: URL={url}, DOMAIN={domain}, EXPLANATION={explanation}")
-                        return False
+                        logger.info(f"analyze_website - AI BLOCKED: URL={url}, DOMAIN={domain}, EXPLANATION={explanation}")
+                        return {'isProductive': False, 'explanation': explanation} # Return dict
                     else:
-                        logger.warning(f"analyze_website - AI returned unexpected verdict '{verdict}'. Defaulting to BLOCK.")
-                        return False
+                        explanation = f"AI returned unexpected verdict '{verdict}'."
+                        logger.warning(f"analyze_website - {explanation} Defaulting to BLOCK.")
+                        return {'isProductive': False, 'explanation': explanation} # Return dict
                 else:
-                    logger.warning(f"analyze_website - AI response format incorrect ('ALLOW:' or 'BLOCK:' expected). Response: '{decision}'. Defaulting to BLOCK.")
-                    return False
+                    explanation = f"AI response format incorrect ('ALLOW:' or 'BLOCK:' expected). Response: '{decision}'."
+                    logger.warning(f"analyze_website - {explanation} Defaulting to BLOCK.")
+                    return {'isProductive': False, 'explanation': explanation} # Return dict
 
             except Exception as e:
+                explanation = f"AI analysis failed: {e}"
                 logger.error(f"analyze_website - Error during AI analysis for {url}: {e}", exc_info=True)
                 logger.info("analyze_website - Defaulting to BLOCKED due to AI analysis error.")
-                return False # Default to blocking if AI fails
+                return {'isProductive': False, 'explanation': explanation} # Return dict
 
         # --- 6. Default Decision ---
         # If we reach here, it means:
@@ -710,8 +728,9 @@ class ProductivityAnalyzer:
         # - Contextualization wasn't required OR context score was low (<0.3).
         # - AI analysis wasn't triggered or wasn't applicable.
         # In this scenario, default to blocking unless context strongly suggested otherwise (which it didn't).
-        logger.info(f"analyze_website - BLOCKED: URL '{url}' did not match allow rules, context relevance low or not applicable, and AI analysis not conclusive/triggered for allowing.")
-        return False
+        explanation = "Blocked by default rules (no specific allow match or low context relevance)."
+        logger.info(f"analyze_website - BLOCKED (Default): URL '{url}'. Reason: {explanation}")
+        return {'isProductive': False, 'explanation': explanation} # Return dict
 
 
 # --- Main Execution Logic ---
@@ -760,10 +779,11 @@ def main():
 
 
                     logger.info(f"main - Analyzing URL: {url} in domain: {domain}")
-                    is_productive = analyzer.analyze_website(url, domain)
-                    result_text = 'PRODUCTIVE' if is_productive else 'NOT PRODUCTIVE'
+                    analysis_result = analyzer.analyze_website(url, domain)
+                    result_text = 'PRODUCTIVE' if analysis_result['isProductive'] else 'NOT PRODUCTIVE'
                     print(f"\n>>> Analysis Result for '{url}': {result_text} for your current context/domain.")
-                    logger.info(f"main - Analysis for URL: {url} - Result: {result_text}")
+                    print(f"Explanation: {analysis_result['explanation']}")
+                    logger.info(f"main - Analysis for URL: {url} - Result: {result_text}, Explanation: {analysis_result['explanation']}")
 
             else:
                 print("Invalid domain. Please choose from work, school, or personal (or 'quit').")
