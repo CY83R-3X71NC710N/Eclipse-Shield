@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Matrix Animation Sandbox</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000;
+            width: 100%;
+            height: 100vh;
+        }
+        iframe {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Direct interface with matrix animation using iframe with absolute path -->
+    <iframe id="matrix-iframe-inner"></iframe>
+    
+    <script>
+        // Set random version on load
+        function setRandomVersion() {
+            const versions = ["trinity", "paradise"];
+            const randomVersion = versions[Math.floor(Math.random() * versions.length)];
+            const iframe = document.getElementById('matrix-iframe-inner');
+            iframe.src = `matrix-animation/index.html?version=${randomVersion}&effect=image&url=../assets/matrixbackground.png`;
+        }
+        
+        // Set random version immediately
+        setRandomVersion();
+        
+        // Handle messages from the parent window
+        window.addEventListener('message', function(event) {
+            console.log('Matrix sandbox received message:', event.data);
+            
+            // Pass any configuration messages to the inner iframe if needed
+            const innerFrame = document.getElementById('matrix-iframe-inner');
+            if (innerFrame && event.data.matrixConfig) {
+                innerFrame.contentWindow.postMessage(event.data.matrixConfig, '*');
+            }
+            
+            // Send response back to confirm the sandbox is working
+            event.source.postMessage({status: 'active', type: 'matrix-sandbox'}, event.origin);
+        });
+        
+        // Let the parent know we're ready
+        window.addEventListener('load', function() {
+            if (window.parent !== window) {
+                window.parent.postMessage({status: 'ready', type: 'matrix-sandbox'}, '*');
+            }
+        });
+    </script>
+</body>
+</html>

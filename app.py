@@ -68,6 +68,36 @@ def after_request(response):
             })
     return response
 
+# NEW: Matrix Animation Routes
+@app.route('/matrix-animation')
+def matrix_animation_page():
+    """Serve the matrix animation page"""
+    return render_template('matrix-animation.html')
+
+@app.route('/matrix-animation/<path:filename>')
+def matrix_animation_files(filename):
+    """Serve matrix animation files"""
+    try:
+        # First, try to find the file in extension/matrix-animation
+        return send_from_directory('extension/matrix-animation', filename)
+    except Exception as e:
+        app.logger.error(f"Error serving matrix-animation/{filename}: {e}")
+        return f"Error loading {filename}", 404
+
+@app.route('/assets/<path:filename>')
+def serve_assets(filename):
+    """Serve files from the assets directory"""
+    try:
+        return send_from_directory('extension/assets', filename)
+    except Exception as e:
+        app.logger.error(f"Error serving assets/{filename}: {e}")
+        return f"Error loading {filename}", 404
+
+@app.route('/matrix-animation.html')
+def matrix_animation_html():
+    """Serve a special HTML wrapper for the matrix animation"""
+    return render_template('matrix-animation-wrapper.html')
+
 @app.route('/ext-popup')
 def popup_page():
     try:
@@ -183,17 +213,9 @@ def analyze():
                         context_dict[question] = answer
             logger.debug(f"Converted context to dictionary: {context_dict}")
         else:
-            context_dict = context
+            context_dict = context if isinstance(context, dict) else {} # Ensure it's a dict or empty dict
 
-        if not context_dict:
-            logger.warning("No valid context data provided")
-            return jsonify({
-                'isProductive': False,
-                'explanation': 'No task context available. Please set up a productivity session.',
-                'confidence': 0.0
-            })
-
-        # Update analyzer context
+        # Update analyzer context (even if empty)
         analyzer.context_data = context_dict
         logger.info(f"Set analyzer context to: {context_dict}")
 
@@ -207,13 +229,17 @@ def analyze():
                 logger.debug(f"Processing direct visit for URL: {url}")
             
             # Check if referrer is a search engine and extract useful information
+            search_query = None
+            is_search_engine_referrer = False
+            
             if referrer:
                 logger.debug(f"Processing referrer information: {referrer}")
                 parsed_referrer = urlparse(referrer)
                 
                 # Check for common search engines
                 if any(search_domain in parsed_referrer.netloc.lower() for search_domain in 
-                       ['google.com', 'bing.com', 'duckduckgo.com', 'yahoo.com', 'brave.com']):
+                       ['google.com', 'bing.com', 'duckduckgo.com', 'yahoo.com', 'brave.com', 'startpage.com']):
+                    is_search_engine_referrer = True
                     additional_signals['from_search_engine'] = True
                     additional_signals['search_engine'] = parsed_referrer.netloc
                     
@@ -225,11 +251,12 @@ def analyze():
                             # Common search query parameter names
                             if key.lower() in ['q', 'query', 'p', 'text', 'search']:
                                 from urllib.parse import unquote_plus
-                                additional_signals['search_query'] = unquote_plus(value)
-                                logger.debug(f"Extracted search query: {additional_signals['search_query']}")
+                                search_query = unquote_plus(value)
+                                additional_signals['search_query'] = search_query
+                                logger.debug(f"Extracted search query: {search_query}")
                                 break
             
-            is_productive = analyzer.analyze_website(url, domain)
+            # Get url_signals for signals analysis
             url_signals = analyzer._analyze_url_components(url)
             
             # Merge additional signals from referrer if present
@@ -237,11 +264,43 @@ def analyze():
                 url_signals.update(additional_signals)
                 logger.debug(f"Enhanced URL signals with referrer/direct visit data: {url_signals}")
             
+            # Get context relevance for additional information
             context_relevance = analyzer._check_context_relevance(url, url_signals)
-
+            
+            # More restrictive handling for search engine referrers with vague queries
+            if is_search_engine_referrer and search_query:
+                # Block by default for very short search queries (less than 3 characters)
+                if len(search_query.strip()) < 3:
+                    logger.info(f"Blocking URL due to very short search query: '{search_query}'")
+                    return jsonify({
+                        'isProductive': False,
+                        'explanation': f"Search query '{search_query}' is too vague to determine relevance to your task.",
+                        'confidence': 0.8,
+                        'signals': url_signals,
+                        'context_relevance': context_relevance,
+                        'search_query_blocked': True
+                    })
+                
+                # If context exists, require a minimum relevance score for search queries
+                if context_dict and context_relevance.get('score', 0) < 0.4:
+                    logger.info(f"Blocking URL due to low context relevance for search query: '{search_query}', score: {context_relevance.get('score', 0)}")
+                    return jsonify({
+                        'isProductive': False,
+                        'explanation': f"Search query '{search_query}' has low relevance to your current task.",
+                        'confidence': 0.7,
+                        'signals': url_signals,
+                        'context_relevance': context_relevance,
+                        'search_query_blocked': True
+                    })
+            
+            # Call the updated analyze_website which returns a dict
+            analysis_result = analyzer.analyze_website(url, domain)
+            logger.info(f"Analysis result for {url}: {analysis_result}")
+            
+            # Build enhanced result with analytics data but use the actual result from analyze_website
             result = {
-                'isProductive': bool(is_productive),
-                'explanation': get_explanation(is_productive, url_signals, context_relevance, context_dict),
+                'isProductive': analysis_result['isProductive'],
+                'explanation': analysis_result['explanation'],
                 'confidence': get_confidence_score(url_signals, context_relevance),
                 'signals': url_signals,
                 'context_relevance': context_relevance,
@@ -250,14 +309,15 @@ def analyze():
                 'direct_visit': is_direct_visit  # Include direct visit flag in result
             }
 
-            # Store result in cache with timestamp and session ID
+            # Add result to cache
             url_cache['data'][cache_key] = result
             url_cache['timestamps'][cache_key] = current_time
             url_cache['session_ids'][cache_key] = session_id
+            logger.debug(f"Cached result for {url}")
             
             # Log more details for direct visits to help with debugging
             if is_direct_visit:
-                logger.info(f"Direct visit analysis result for {url}: isProductive={is_productive}, explanation={result['explanation']}")
+                logger.info(f"Direct visit analysis result for {url}: isProductive={result['isProductive']}, explanation={result['explanation']}")
 
             return jsonify(result)
 
@@ -266,7 +326,7 @@ def analyze():
             return jsonify({
                 'error': str(e),
                 'isProductive': False,
-                'explanation': 'Error analyzing URL'
+                'explanation': f'Error analyzing URL: {str(e)}'
             }), 500
 
     except Exception as e:
@@ -274,23 +334,10 @@ def analyze():
         return jsonify({
             'error': str(e),
             'isProductive': False,
-            'explanation': 'Error processing request'
+            'explanation': f'Error processing request: {str(e)}'
         }), 500
 
-def get_explanation(is_productive: bool, signals: dict, relevance: dict, context: dict) -> str:
-    """Generate a detailed explanation based on context and analysis."""
-    if not context:
-        return "No task context available. Please set up a productivity session."
-    
-    if is_productive:
-        if relevance.get('matched_terms'):
-            return f"Content matches your task: {', '.join(relevance['matched_terms'])}"
-        elif signals.get('is_search'):
-            return 'Search query allowed for task research'
-        return 'Content appears relevant to your task'
-    
-    return 'Content does not match your current task focus'
-
+# Since analyze_website now returns the explanation directly, this function is only used for confidence scoring
 def get_confidence_score(signals: dict, relevance: dict) -> float:
     """Calculate confidence score based on signals and relevance."""
     base_score = 0.5

@@ -2,8 +2,10 @@
 <html>
 <head>
     <title>New Tab</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        /* Replace Google Fonts import with local font-face declaration */
+        /* Local Font */
         @font-face {
             font-family: 'Share Tech Mono';
             font-style: normal;
@@ -15,1174 +17,176 @@
         }
 
         :root {
-            --matrix-green: #00ff00;
-            --glow-color: rgba(0, 255, 0, 0.5);
-            --dark-bg: #000;
+            --matrix-green: #00ff41;
+            --glow-color: rgba(0, 255, 65, 0.7);
+            --dark-bg: #000500;
+            --placeholder-size: 1.8rem;
+            --search-transition-speed: 0.6s;
+            --max-expanded-width: 96vw;
+            /* Parallax Configuration */
+            --perspective: 900px;
+            --parallax-sensitivity: 0.06;
+            --parallax-max-rotate: 18deg;
+            --parallax-transition-speed: 0.1s;
+            /* Effects Configuration */
+            --rgb-border-speed: 1.5s;
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        /* UPDATED: Aggressive Cursor Hiding */
+        * { margin: 0; padding: 0; box-sizing: border-box; cursor: none !important; } /* Added !important */
+        html, body { height: 100%; width: 100%; cursor: none !important; } /* Added !important */
 
         body {
-            perspective: 2000px;
-            transform-style: preserve-3d;
-            background: radial-gradient(circle at center,
-                rgba(0, 21, 0, 0.9) 0%,
-                rgba(0, 8, 0, 0.95) 40%,
-                rgba(0, 3, 0, 0.98) 60%,
-                rgb(0, 0, 0) 100%
-            );
-            color: var(--matrix-green);
-            font-family: 'Share Tech Mono', monospace;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
+            background: var(--dark-bg); color: var(--matrix-green); font-family: 'Share Tech Mono', monospace;
+            min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center;
+            overflow: hidden; perspective: var(--perspective);
         }
 
-        .content-wrapper {
-            position: relative;
-            z-index: 2;
-            width: 100%;
-            max-width: 1200px;
-            padding: 2rem;
-            text-align: center;
-            animation: fadeIn 1s ease-out;
-            transform: translateZ(100px) rotateX(2deg);
-            transform-style: preserve-3d;
-        }
+        /* --- Matrix Background Iframe --- */
+        #matrix-iframe { position: fixed; top: 0; left: 50%; transform: translateX(-51%); width: 100%; height: 100%; border: none; z-index: 0; pointer-events: none; opacity: 1; }
 
-        .search-container {
-            background: rgba(0, 0, 0, 0.85); /* Darker background */
-            padding: 2.5rem 4rem;
-            border-radius: 10px;
-            border: 1px solid var(--matrix-green);
-            box-shadow: 
-                0 0 30px var(--glow-color),
-                0 20px 40px rgba(0, 0, 0, 0.6),
-                inset 0 0 20px rgba(0, 255, 0, 0.2); /* Inner glow */
-            backdrop-filter: blur(15px); /* Increased blur */
-            transform-style: preserve-3d;
-            animation: float 6s ease-in-out infinite;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            perspective: 1000px;
-            width: 95%;
-            max-width: 1400px;
-            margin: 0 auto;
-        }
+        /* --- Overlays --- */
+        .scanline { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, transparent 50%, rgba(0, 255, 0, 0.015) 50%); background-size: 100% 4px; z-index: 2; pointer-events: none; animation: scan 15s linear infinite; mix-blend-mode: overlay; }
+        @keyframes scan { from { background-position: 0 0; } to { background-position: 0 -500px; } }
+        .vignette { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(ellipse at center, transparent 35%, rgba(0, 5, 0, 0.8) 75%, rgba(0, 0, 0, 1) 100%); z-index: 3; pointer-events: none; }
 
-        .search-container:hover {
-            transform: translateY(-5px) scale(1.02) translateZ(150px) rotateX(8deg);
-            box-shadow: 0 0 30px var(--glow-color),
-                       0 0 60px rgba(0, 255, 0, 0.3);
-        }
+        /* --- Custom Cursor --- */
+        .custom-cursor { position: fixed; pointer-events: none; z-index: 10000; opacity: 0; transition: opacity 0.2s ease-in-out; }
+        .cursor-ring { position: fixed; width: 28px; height: 28px; border: 2px solid var(--matrix-green); border-radius: 50%; transform: translate(-50%, -50%) scale(1); pointer-events: none; transition: transform 0.2s cubic-bezier(0.1, 0.7, 0.3, 1), border-color 0.1s, box-shadow 0.1s; box-shadow: 0 0 8px rgba(0, 255, 65, 0); mix-blend-mode: screen; }
+        .cursor-dot { position: fixed; width: 5px; height: 5px; background-color: #fff; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; box-shadow: 0 0 6px #fff, 0 0 10px rgba(255, 255, 255, 0.5); }
 
-        @keyframes float {
-            0%, 100% { transform: translateY(0) rotateX(0deg); }
-            50% { transform: translateY(-10px) rotateX(2deg); }
-        }
+        /* --- Parallax & Content --- */
+        .parallax-container { transform-style: preserve-3d; transition: transform var(--parallax-transition-speed) ease-out; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; position: relative; z-index: 5; transform: rotateX(0deg) rotateY(0deg) translateZ(0px); }
+        .content-wrapper { position: relative; width: 100%; max-width: 1100px; padding: 2rem; text-align: center; animation: contentFadeIn 1.2s ease-out 0.3s forwards; opacity: 0; transform-style: preserve-3d; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; }
+        @keyframes contentFadeIn { from { opacity: 0; transform: translateY(25px) translateZ(-60px); } to { opacity: 1; transform: translateY(0) translateZ(0px); } }
 
+        /* --- Search Container --- */
+        .search-container { background: rgba(0, 15, 0, 0.75); padding: 2.5rem 3.5rem; border-radius: 10px; border: 1px solid rgba(0, 255, 65, 0.5); box-shadow: 0 0 25px rgba(0, 255, 65, 0.25), 0 18px 35px rgba(0, 0, 0, 0.8), inset 0 0 18px rgba(0, 255, 65, 0.15); backdrop-filter: blur(10px); transform-style: preserve-3d; width: 90%; max-width: 800px; margin: 0 auto 2.5rem auto; position: relative; overflow: hidden; transition: box-shadow 0.4s ease, border-color 0.4s ease, max-width var(--search-transition-speed) cubic-bezier(0.25, 1, 0.5, 1), padding var(--search-transition-speed) cubic-bezier(0.25, 1, 0.5, 1), transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); transform: translateZ(5px); }
+        .search-container.expanded { max-width: var(--max-expanded-width); padding: 3rem 4.5rem; transform: translateY(-5px) scale(1.01) translateZ(20px) rotateX(0deg) rotateY(0deg) !important; }
+         .search-container:hover:not(.expanded) { box-shadow: 0 0 35px rgba(0, 255, 65, 0.45), 0 0 60px rgba(0, 255, 65, 0.25), 0 25px 45px rgba(0, 0, 0, 0.85), inset 0 0 25px rgba(0, 255, 65, 0.2); border-color: rgba(0, 255, 65, 0.7); }
+
+        /* --- Search Box Input --- */
         .search-box {
-            width: 100%;
-            padding: 30px 40px;  /* Increased padding */
-            min-width: 600px;    /* Minimum width */
-            font-size: var(--placeholder-size, 1.6rem);
-            background: rgba(0, 15, 0, 0.5); /* Slightly darker input */
-            border: 2px solid rgba(0, 255, 0, 0.5);
-            color: var(--matrix-green);
-            border-radius: 5px;
-            outline: none;
-            font-family: 'Share Tech Mono', monospace;
-            box-shadow: 0 0 20px var(--glow-color);
-            transition: all 0.3s ease;
-            margin-bottom: 1.5rem;
-            transform: translateZ(30px);
-            backdrop-filter: blur(5px);
-            letter-spacing: 1px;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
-            transform-style: preserve-3d;
-            overflow: visible;
-            text-shadow: 0 0 10px var(--glow-color);
-            max-width: 800px;  /* Add max-width */
-            margin: 0 auto;    /* Center the search box */
-            transition: font-size 0.05s ease-out;
+            width: 100%; padding: 20px 30px; font-size: var(--placeholder-size);
+            line-height: 1.4; min-height: 75px; background: rgba(0, 0, 0, 0.7);
+            border: 3px solid rgba(0, 255, 65, 0.4);
+            color: var(--matrix-green); border-radius: 6px; outline: none;
+            font-family: 'Share Tech Mono', monospace; text-shadow: 0 0 6px rgba(0, 255, 65, 0.8);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6), 0 0 12px rgba(0, 255, 65, 0.15);
+            margin-bottom: 0; transform: translateZ(15px); backdrop-filter: blur(5px);
+            letter-spacing: 1px; position: relative; overflow: visible; text-align: center;
+            transition: font-size 0.25s ease-out, transform 0.3s ease, box-shadow 0.3s ease, line-height 0.25s ease-out, padding 0.25s ease-out;
+            cursor: none; /* Ensure input itself has no cursor */
         }
-
-        .search-box.active {
-            transform: perspective(1000px) scale(1.02) translateZ(50px);
-            border-color: transparent;
-            box-shadow: 
-                0 0 30px var(--glow-color),
-                0 0 60px var(--glow-color),
-                inset 0 0 20px rgba(0, 255, 0, 0.2);
-            animation: 
-                neonPulse 1s ease-in-out infinite,
-                borderFlow 2s linear infinite,
-                dimensionalShift 0.5s ease-out;
-            transform: scale(1.02) translateY(-2px) translateZ(20px);
-            animation: searchBoxGlow 0.5s ease-out;
-            border-image: linear-gradient(
-                90deg,
-                #00ff00,
-                #00ffff,
-                #0099ff,
-                #00ff00
-            ) 1;
-            border-image-slice: 1;
-        }
-
-        @keyframes neonPulse {
-            0%, 100% { box-shadow: 0 0 30px var(--glow-color), 0 0 60px var(--glow-color); }
-            50% { box-shadow: 0 0 40px var(--glow-color), 0 0 80px var(--glow-color); }
-        }
-
-        @keyframes borderFlow {
-            0% { border-image: linear-gradient(90deg, #00ff00, #00ffff, #0099ff) 1; }
-            50% { border-image: linear-gradient(180deg, #0099ff, #00ff00, #00ffff) 1; }
-            100% { border-image: linear-gradient(270deg, #00ffff, #0099ff, #00ff00) 1; }
-        }
-
-        @keyframes dimensionalShift {
-            0% { transform: perspective(1000px) rotateX(0) scale(1); }
-            30% { transform: perspective(1000px) rotateX(10deg) scale(1.03); }
-            100% { transform: perspective(1000px) rotateX(0) scale(1.02); }
-        }
-
-        @keyframes searchBoxGlow {
-            0% {
-                box-shadow: 0 0 5px var(--glow-color);
-            }
-            50% {
-                box-shadow: 
-                    0 0 20px var(--glow-color),
-                    0 0 40px var(--glow-color),
-                    inset 0 0 15px rgba(0, 255, 0, 0.5);
-            }
-            100% {
-                box-shadow: 0 0 5px var(--glow-color);
-            }
-        }
-
-        .search-box::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: linear-gradient(
-                45deg,
-                transparent,
-                rgba(0, 255, 0, 0.1),
-                transparent
-            );
-            transform: translateY(-100%) rotate(45deg);
-            transition: transform 0.5s;
-        }
-
-        .search-box.active::before {
-            transform: translateY(100%) rotate(45deg);
-        }
-
-        .search-box::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: radial-gradient(
-                circle at var(--x, 50%) var(--y, 50%),
-                rgba(0, 255, 0, 0.2) 0%,
-                transparent 50%
-            );
-            opacity: 0;
-            transition: opacity 0.3s;
-            pointer-events: none;
-            mix-blend-mode: screen;
-        }
-
-        .search-box.active::after {
-            opacity: 1;
-        }
-
         .search-box:focus {
-            box-shadow: 0 0 30px var(--glow-color);
-            border-color: #fff;
-            transform: scale(1.02) translateZ(50px);
-            box-shadow: 0 0 30px var(--glow-color),
-                       0 0 60px var(--glow-color),
-                       0 25px 50px rgba(0,0,0,0.5);
-        }
-
-        .search-box::placeholder,
-        .search-box::-webkit-input-placeholder {
-            font-size: inherit !important;
-            color: var(--matrix-green);
-            opacity: 0.7;
-            transition: font-size 0.05s ease-out;
-            width: 100%;
-            text-align: center;
-            letter-spacing: 0.5px;
-        }
-
-        @keyframes typing {
-            from { width: 0 }
-            to { width: 100% }
-        }
-
-        @keyframes typing-cursor {
-            0%, 100% { border-right-color: transparent; }
-            50% { border-right-color: var(--matrix-green); }
-        }
-
-        .timer {
-            margin-top: 3rem;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 1rem;
-            transform-style: preserve-3d;
-            transform: translateZ(50px);
-        }
-
-        .timer-label {
-            font-size: 1.4rem;
-            opacity: 0.9;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            text-shadow: 0 0 10px var(--glow-color);
-        }
-
-        #countdown {
-            font-size: 4rem;
-            font-weight: bold;
-            letter-spacing: 4px;
-            animation: pulse 1.5s ease-in-out infinite, glitch 4s steps(1) infinite;
-            position: relative;
-            transition: transform 0.3s;
-            transform: translateZ(40px);
-            text-shadow: 0 0 20px var(--glow-color),
-                        0 10px 30px rgba(0, 255, 0, 0.3);
-        }
-
-        #countdown:hover {
-            transform: scale(1.1);
-            text-shadow: 0 0 20px var(--glow-color),
-                        0 0 40px var(--glow-color),
-                        0 0 60px var(--glow-color);
-        }
-
-        .domain-label {
-            margin-top: 1rem;
-            font-size: 1.2rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #88ff88;
-            text-shadow: 0 0 5px var(--glow-color);
-            transform: translateZ(20px);
-        }
-
-        #activeDomain {
-            font-weight: bold;
-            letter-spacing: 2px;
-            animation: glow 2s ease-in-out infinite;
-            position: relative;
-            padding: 0 10px;
-        }
-
-        #activeDomain::before {
-            content: '';
-            position: absolute;
-            top: -2px;
-            left: -2px;
-            right: -2px;
-            bottom: -2px;
-            border: 1px solid var(--matrix-green);
-            animation: border-glow 2s ease-in-out infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { text-shadow: 0 0 20px var(--glow-color); }
-            50% { text-shadow: 0 0 40px var(--glow-color), 0 0 60px var(--glow-color); }
-        }
-
-        @keyframes glow {
-            0%, 100% { text-shadow: 0 0 5px var(--glow-color); }
-            50% { text-shadow: 0 0 20px var(--glow-color); }
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes border-glow {
-            0%, 100% { box-shadow: 0 0 5px var(--glow-color); }
-            50% { box-shadow: 0 0 20px var(--glow-color), 0 0 30px var(--glow-color); }
-        }
-
-        #matrixCanvas {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 1;
-            opacity: 0.3;
-            transform: translateZ(-100px);
-            filter: none;
-            backface-visibility: hidden;
-        }
-
-        .scanline {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(to bottom,
-                transparent 50%,
-                rgba(0, 255, 0, 0.02) 50%
-            );
-            background-size: 100% 4px;
-            z-index: 2;
-            pointer-events: none;
-            animation: scan 10s linear infinite;
-        }
-
-        @keyframes scan {
-            from { background-position: 0 0; }
-            to { background-position: 0 -512px; }
-        }
-
-        /* Add cursor styles */
-        * { cursor: none !important; }
-
-        .custom-cursor {
-            position: fixed;
-            pointer-events: none;
-            z-index: 10000;
-            display: none;
-            top: 0;
-            left: 0;
-        }
-
-        .cursor-ring {
-            position: fixed;
-            width: 30px;
-            height: 30px;
-            border: 2px solid rgb(0, 255, 0);
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            mix-blend-mode: screen;
-            pointer-events: none;
-            transition: border-color 0.1s ease, box-shadow 0.1s ease;
-        }
-
-        .cursor-ring::before,
-        .cursor-ring::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 100%;
-            height: 100%;
-            border: 2px solid var(--matrix-green);
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            animation: cursor-pulse 2s ease-out infinite;
-        }
-
-        .cursor-ring::after {
-            animation-delay: 0.5s;
-        }
-
-        .cursor-dot {
-            position: fixed;
-            width: 4px;
-            height: 4px;
-            background: #fff;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-            box-shadow: 0 0 8px #fff;
-        }
-
-        /* Replace cursor trail styles with matrix particle styles */
-        .matrix-particle {
-            position: fixed;
-            color: var(--matrix-green);
-            font-family: 'Share Tech Mono', monospace;
-            font-size: 16px;
-            pointer-events: none;
-            text-shadow: 0 0 8px var(--matrix-green);
-            z-index: 10000;
-            opacity: 1;
-            transition: opacity 1s ease;
-            transform-origin: center;
-        }
-
-        /* Add glitch effect for text */
-        .glitch-text {
-            position: relative;
-        }
-
-        .glitch-text::before,
-        .glitch-text::after {
-            content: attr(data-text);
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-        }
-
-        .glitch-text::before {
-            left: 2px;
-            text-shadow: -2px 0 #ff0000;
-            animation: glitch-1 2s infinite linear;
-            background: black;
-            clip: rect(44px, 450px, 56px, 0);
-        }
-
-        .glitch-text::after {
-            left: -2px;
-            text-shadow: -2px 0 #00ff00;
-            animation: glitch-2 1s infinite linear;
-            background: black;
-            clip: rect(44px, 450px, 56px, 0);
-        }
-
-        @keyframes glitch {
-            0% { transform: none; filter: none; }
-            2% { transform: translate(-2px, 1px); filter: hue-rotate(-45deg); }
-            4% { transform: translate(2px, -1px); filter: hue-rotate(45deg); }
-            6% { transform: none; filter: none; }
-            8% { transform: translate(1px, 1px); filter: hue-rotate(20deg); }
-            10% { transform: none; filter: none; }
-            90% { transform: none; filter: none; }
-            92% { transform: translate(2px, -2px); filter: hue-rotate(-30deg); }
-            94% { transform: translate(-2px, 2px); filter: hue-rotate(30deg); }
-            96% { transform: none; filter: none; }
-            98% { transform: translate(1px, -1px); filter: hue-rotate(15deg); }
-            100% { transform: none; filter: none; }
-        }
-
-        #countdown::before,
-        #countdown::after {
-            content: attr(data-text);
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            clip: rect(0, 900px, 0, 0);
-            animation: glitch-anim 2s infinite linear alternate-reverse;
-        }
-
-        #countdown::before {
-            left: 2px;
-            text-shadow: 1px 0 #00ffff;
-            clip: rect(44px, 450px, 56px, 0);
-        }
-
-        #countdown::after {
-            left: -2px;
-            text-shadow: -1px 0 #ff00ff;
-            clip: rect(44px, 450px, 56px, 0);
-            animation-delay: 1s;
-        }
-
-        @keyframes glitch-anim {
-            0% { clip: rect(38px, 9999px, 72px, 0); }
-            5% { clip: rect(95px, 9999px, 13px, 0); }
-            10% { clip: rect(66px, 9999px, 92px, 0); }
-            15% { clip: rect(87px, 9999px, 5px, 0); }
-            20% { clip: rect(26px, 9999px, 48px, 0); }
-            25% { clip: rect(33px, 9999px, 94px, 0); }
-            30% { clip: rect(9px, 9999px, 52px, 0); }
-            35% { clip: rect(69px, 9999px, 15px, 0); }
-            40% { clip: rect(45px, 9999px, 89px, 0); }
-            45% { clip: rect(98px, 9999px, 28px, 0); }
-            50% { clip: rect(11px, 9999px, 63px, 0); }
-            55% { clip: rect(74px, 9999px, 37px, 0); }
-            60% { clip: rect(56px, 9999px, 81px, 0); }
-            65% { clip: rect(22px, 9999px, 46px, 0); }
-            70% { clip: rect(93px, 9999px, 19px, 0); }
-            75% { clip: rect(31px, 9999px, 87px, 0); }
-            80% { clip: rect(51px, 9999px, 64px, 0); }
-            85% { clip: rect(82px, 9999px, 35px, 0); }
-            90% { clip: rect(12px, 9999px, 79px, 0); }
-            95% { clip: rect(91px, 9999px, 23px, 0); }
-            100% { clip: rect(45px, 9999px, 58px, 0); }
-        }
-
-        /* Add ripple effect for clicks */
-        .ripple {
-            position: fixed; /* Ensure fixed positioning */
-            width: 2px;
-            height: 2px;
-            border: 2px solid var(--matrix-green);
-            border-radius: 50%;
-            animation: ripple 0.8s ease-out;
-            pointer-events: none;
-            transform: translate(-50%, -50%); /* Center the ripple */
-        }
-
-        @keyframes ripple {
-            0% {
-                width: 0;
-                height: 0;
-                opacity: 0.8;
-                border-width: 2px;
-            }
-            100% {
-                width: 100px;
-                height: 100px;
-                opacity: 0;
-                border-width: 1px;
-            }
-        }
-
-        .mini-ripple {
-            animation: mini-ripple 0.5s ease-out;
-            border-width: 1px;
-        }
-
-        @keyframes mini-ripple {
-            0% {
-                width: 0;
-                height: 0;
-                opacity: 0.8;
-                border-width: 1px;
-            }
-            100% {
-                width: 50px;
-                height: 50px;
-                opacity: 0;
-                border-width: 0.5px;
-            }
-        }
-
-        @keyframes ripple {
-            0% {
-                width: 0;
-                height: 0;
-                opacity: 0.8;
-                border-width: 3px;
-                box-shadow: 0 0 20px var(--matrix-green);
-            }
-            100% {
-                width: 200px;
-                height: 200px;
-                opacity: 0;
-                border-width: 1px;
-                box-shadow: 0 0 40px var(--matrix-green);
-            }
-        }
-
-        .glitch-click {
-            animation: glitch-click 0.5s ease-out;
-        }
-
-        @keyframes glitch-click {
-            0% { transform: skew(0deg); filter: hue-rotate(0deg); }
-            20% { transform: skew(10deg); filter: hue-rotate(90deg); }
-            40% { transform: skew(-10deg); filter: hue-rotate(-90deg); }
-            60% { transform: skew(5deg); filter: hue-rotate(45deg); }
-            80% { transform: skew(-5deg); filter: hue-rotate(-45deg); }
-            100% { transform: skew(0deg); filter: hue-rotate(0deg); }
-        }
-
-        .tornado-particle {
-            display: none;
-        }
-
-        .background-effects {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 0;
-            pointer-events: none;
-            transform-style: preserve-3d;
-            perspective: 1000px;
-            filter: none;
-            opacity: 1;
-        }
-
-        .vignette {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: radial-gradient(circle at center,
-                transparent 0%,
-                transparent 50%,
-                rgba(0, 10, 0, 0.4) 100%
-            );
-            z-index: 3;
-            pointer-events: none;
-            transform: translateZ(10px);
-        }
-
-        .floating-particle {
-            position: fixed;
-            background: var(--matrix-green);
-            border-radius: 50%;
-            opacity: 0.25;
-            filter: none;
-            pointer-events: none;
-            box-shadow: 0 0 10px var(--glow-color);
-        }
-
-        @keyframes float-3d {
-            0% { 
-                transform: translate3d(var(--x), var(--y), 0)
-                          rotate3d(1, 1, 1, 0deg) scale(1); 
-            }
-            50% { 
-                transform: translate3d(calc(var(--x) + 100px), 
-                                     calc(var(--y) + 50px), 
-                                     150px)
-                          rotate3d(1, 1, 1, 180deg) scale(1.2); 
-            }
-            100% { 
-                transform: translate3d(var(--x), var(--y), 0)
-                          rotate3d(1, 1, 1, 360deg) scale(1); 
-            }
-        }
-
-        /* Add glass morphism effect to containers */
-        .glass-effect {
-            background: rgba(0, 15, 0, 0.1);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(0, 255, 0, 0.2);
-            box-shadow: 
-                0 8px 32px 0 rgba(0, 255, 0, 0.1),
-                inset 0 0 32px 0 rgba(0, 255, 0, 0.1);
-        }
-
-        /* Add subtle parallax effect on mouse move */
-        .parallax-container {
-            transform-style: preserve-3d;
-            transition: transform 0.2s ease-out;
-        }
-
-        /* New digital burst effect styles */
-        .digital-particle {
-            position: fixed;
-            color: var(--matrix-green);
-            font-family: 'Share Tech Mono', monospace;
-            pointer-events: none;
-            z-index: 1000;
-            transform-origin: center;
-            text-shadow: 0 0 8px var(--matrix-green);
-            mix-blend-mode: screen;
-        }
-
-        .shockwave {
-            position: fixed;
-            width: 20px;
-            height: 20px;
-            border: 2px solid var(--matrix-green);
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-            z-index: 999;
-            animation: shockwave 1s ease-out;
-            mix-blend-mode: screen;
-        }
-
-        @keyframes shockwave {
-            0% {
-                width: 0;
-                height: 0;
-                border-width: 4px;
-                opacity: 1;
-                box-shadow: 0 0 30px var(--matrix-green);
-            }
-            100% {
-                width: 300px;
-                height: 300px;
-                border-width: 1px;
-                opacity: 0;
-                box-shadow: 0 0 0 var(--matrix-green);
-            }
-        }
-
-        /* Searchbox animations */
-        @keyframes keyTypedAnimation {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.02) rotate(0.5deg); }
-            100% { transform: scale(1); }
-        }
-
-        @keyframes glowPulse {
-            0% { filter: brightness(1); }
-            50% { filter: brightness(1.2); }
-            100% { filter: brightness(1); }
-        }
-
-        @keyframes borderGlow {
-            0% { border-radius: 4px; }
-            50% { border-radius: 8px; }
-            100% { border-radius: 4px; }
-        }
-
-        @keyframes tiltEffect {
-            0% { transform: perspective(500px) rotateX(0); }
-            25% { transform: perspective(500px) rotateX(2deg); }
-            75% { transform: perspective(500px) rotateX(-1deg); }
-            100% { transform: perspective(500px) rotateX(0); }
-        }
-
-        .search-ripple {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 0;
-            height: 0;
-            background: radial-gradient(circle, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0) 70%);
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            animation: rippleEffect 0.5s ease-out;
-            pointer-events: none;
-            background: radial-gradient(
-                circle,
-                rgba(0, 255, 0, 0.8) 0%,
-                rgba(0, 255, 0, 0.4) 30%,
-                transparent 70%
-            );
-            mix-blend-mode: screen;
-            animation: searchRipple 0.8s cubic-bezier(0, 0.8, 0.2, 1) forwards;
-        }
-
-        .search-particle {
-            position: absolute;
-            width: 4px;
-            height: 4px;
-            background: var(--particle-color);
-            border-radius: 50%;
-            pointer-events: none;
-            background: none;
-            font-family: 'Share Tech Mono', monospace;
-            color: var(--matrix-green);
-            text-shadow: 0 0 8px var(--glow-color);
-            animation: particleDrift 1s ease-out forwards;
-            pointer-events: none;
-            font-family: 'Share Tech Mono', monospace;
-            color: var(--matrix-green);
-            text-shadow: 0 0 8px var(--glow-color);
-            z-index: 100;
-        }
-
-        .glitch-effect {
-            animation: glitchEffect 0.3s ease-out;
-        }
-
-        @keyframes rippleEffect {
-            0% { width: 0; height: 0; opacity: 1; }
-            100% { width: 200px; height: 200px; opacity: 0; }
-        }
-
-        @keyframes glitchEffect {
-            0% { clip-path: inset(0 0 0 0); }
-            20% { clip-path: inset(20% 0 0 0); }
-            40% { clip-path: inset(0 20% 0 0); }
-            60% { clip-path: inset(0 0 20% 0); }
-            80% { clip-path: inset(0 0 0 20%); }
-            100% { clip-path: inset(0 0 0 0); }
-        }
-
-        @keyframes particleDrift {
-            0% {
-                transform: translate(-50%, -50%) scale(0.5);
-                opacity: 1;
-            }
-            100% {
-                transform: translate(
-                    calc(-50% + ${Math.random() * 200 - 100}px),
-                    calc(-50% + ${Math.random() * 200 - 100}px)
-                ) scale(0);
-                opacity: 0;
-            }
-        }
-
-        @keyframes searchRipple {
-            0% {
-                width: 0;
-                height: 0;
-                opacity: 1;
-                transform: translate(-50%, -50%) scale(0);
-            }
-            100% {
-                width: 300px;
-                height: 300px;
-                opacity: 0;
-                transform: translate(-50%, -50%) scale(1);
-            }
-        }
-
-        /* Smooth typing animation */
-        @keyframes smoothPop {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.02); }
-            100% { transform: scale(1); }
-        }
-
-        .search-box.typing {
-            animation: smoothPop 0.15s ease-out;
-            border-image: linear-gradient(
-                90deg,
-                #00ff00,
-                #00ffff,
-                #0099ff,
-                #00ff00
-            ) 1;
-        }
-
-        /* Matrix particles at cursor position */
-        .matrix-cursor-particle {
-            position: absolute; /* Changed from fixed to absolute */
-            color: var(--matrix-green);
-            font-family: 'Share Tech Mono', monospace;
-            font-size: 1.2rem;
-            pointer-events: none;
-            text-shadow: 0 0 8px var(--glow-color);
-            z-index: -1; /* Place under text */
-            opacity: 0;
-            animation: matrixParticleFall 1s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        @keyframes matrixParticleFall {
-            0% {
-                transform: translateY(0) scale(1);
-                opacity: 1;
-            }
-            100% {
-                transform: translateY(50px) scale(0.5);
-                opacity: 0;
-            }
-        }
-
-        /* Advanced Cyberpunk Effects */
-        .search-box.typing::before {
-            content: '';
-            position: absolute;
-            inset: -10px;
-            background: conic-gradient(
-                transparent 0deg,
-                var(--matrix-green) 45deg,
-                transparent 50deg,
-                transparent 310deg,
-                var(--matrix-green) 315deg,
-                transparent 360deg
-            );
-            animation: rotateFrame 2s linear infinite;
-            mask: linear-gradient(#000, #000) content-box,
-                  linear-gradient(#000, #000);
-            mask-composite: exclude;
-            pointer-events: none;
-        }
-
-        @keyframes rotateFrame {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 20px rgba(0, 255, 65, 0.6), 0 0 35px rgba(0, 255, 65, 0.4);
+            transform: scale(1.015) translateZ(25px);
+            cursor: none; /* Ensure input still has no cursor when focused */
+        }
+
+        /* RGB Border Animation on Typing */
+        .search-box.typing { animation: rgbBorderPulse var(--rgb-border-speed) linear infinite; }
+        @keyframes rgbBorderPulse {
+            0%   { border-color: hsl(120, 100%, 50%); box-shadow: inset 0 1px 3px rgba(0,0,0,0.4), 0 0 25px hsla(120, 100%, 50%, 0.8), 0 0 40px hsla(120, 100%, 50%, 0.6); }
+            17%  { border-color: hsl(180, 100%, 50%); box-shadow: inset 0 1px 3px rgba(0,0,0,0.4), 0 0 27px hsla(180, 100%, 50%, 0.8), 0 0 42px hsla(180, 100%, 50%, 0.6); }
+            33%  { border-color: hsl(240, 100%, 60%); box-shadow: inset 0 1px 3px rgba(0,0,0,0.4), 0 0 25px hsla(240, 100%, 60%, 0.8), 0 0 40px hsla(240, 100%, 60%, 0.6); }
+            50%  { border-color: hsl(300, 100%, 50%); box-shadow: inset 0 1px 3px rgba(0,0,0,0.4), 0 0 27px hsla(300, 100%, 50%, 0.8), 0 0 42px hsla(300, 100%, 50%, 0.6); }
+            67%  { border-color: hsl(0, 100%, 55%);   box-shadow: inset 0 1px 3px rgba(0,0,0,0.4), 0 0 25px hsla(0, 100%, 55%, 0.8),   0 0 40px hsla(0, 100%, 55%, 0.6); }
+            83%  { border-color: hsl(60, 100%, 50%);  box-shadow: inset 0 1px 3px rgba(0,0,0,0.4), 0 0 27px hsla(60, 100%, 50%, 0.8),  0 0 42px hsla(60, 100%, 50%, 0.6); }
+            100% { border-color: hsl(120, 100%, 50%); box-shadow: inset 0 1px 3px rgba(0,0,0,0.4), 0 0 25px hsla(120, 100%, 50%, 0.8), 0 0 40px hsla(120, 100%, 50%, 0.6); }
+        }
+        .search-box:not(.typing) { border-color: rgba(0, 255, 65, 0.4); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6), 0 0 12px rgba(0, 255, 65, 0.15); animation: none; }
+        .search-box:focus:not(.typing) { border-color: rgba(0, 255, 65, 0.9); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 20px rgba(0, 255, 65, 0.6), 0 0 35px rgba(0, 255, 65, 0.4); }
+
+        /* Placeholder Styling */
+        .search-box::placeholder, .search-box::-webkit-input-placeholder { font-size: inherit !important; line-height: inherit !important; color: rgba(0, 255, 65, 0.65); opacity: 1; transition: color 0.3s ease, opacity 0.3s ease; width: 100%; text-align: center; letter-spacing: inherit; position: relative; white-space: nowrap; vertical-align: middle; display: inline-block; }
+        .search-box:focus::placeholder, .search-box:focus::-webkit-input-placeholder { color: transparent; opacity: 0; }
+
+        /* Active State pulse */
+        .search-box.active { animation: activePulse 0.18s ease-out; }
+        @keyframes activePulse { 0% { transform: scale(1.015) translateZ(25px); } 50% { transform: scale(1.025) translateZ(30px); } 100% { transform: scale(1.015) translateZ(25px); } }
+
+        /* --- Timer & Domain --- */
+        .timer-container { opacity: 0; transition: opacity 0.5s ease-in-out, filter 0.2s ease-in-out; margin-top: 2.5rem; transform-style: preserve-3d; transform: translateZ(10px); }
+        .timer-container.active { opacity: 1; }
+        .timer { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; transform: translateZ(15px); }
+        .timer-label { font-size: 1rem; opacity: 0.8; text-transform: uppercase; letter-spacing: 1.5px; text-shadow: 0 0 5px rgba(0, 255, 65, 0.5); transform: translateZ(5px); }
+        #countdown { font-size: 3.5rem; font-weight: normal; letter-spacing: 3px; animation: pulse 2s ease-in-out infinite; position: relative; text-shadow: 0 0 15px rgba(0, 255, 65, 0.7), 0 0 25px rgba(0, 255, 65, 0.3); transform: translateZ(10px); }
+        .domain-label { margin-top: 0.8rem; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; color: #a0ffa0; text-shadow: 0 0 4px rgba(0, 255, 65, 0.4); transform: translateZ(5px); }
+        #activeDomain { font-weight: bold; letter-spacing: 1.5px; margin-left: 5px; display: inline-block; position: relative; }
+        @keyframes pulse { 0%, 100% { text-shadow: 0 0 15px rgba(0, 255, 65, 0.7), 0 0 25px rgba(0, 255, 65, 0.3); transform: scale(1) translateZ(10px); } 50% { text-shadow: 0 0 25px rgba(0, 255, 65, 0.9), 0 0 40px rgba(0, 255, 65, 0.5); transform: scale(1.03) translateZ(12px); } }
+
+        /* --- Glitch Effect --- */
+        .glitch-text { position: relative; }
+        .glitch-text[data-text]::before, .glitch-text[data-text]::after { content: attr(data-text); position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: inherit; color: inherit; overflow: hidden; clip: rect(0, 900px, 0, 0); pointer-events: none; }
+        .glitch-text[data-text]::before { left: 2px; text-shadow: -1px 0 #ff00ff; animation: glitch-anim-1 2.5s infinite linear alternate-reverse; }
+        .glitch-text[data-text]::after { left: -2px; text-shadow: 1px 0 #00ffff; animation: glitch-anim-2 3s infinite linear alternate-reverse; }
+        @keyframes glitch-anim-1 { 0% { clip: rect(42px, 9999px, 44px, 0); transform: skew(0.3deg);} 5% { clip: rect(17px, 9999px, 94px, 0); transform: skew(0.7deg);} 10%, 15% { clip: rect(50px, 9999px, 30px, 0); transform: skew(-0.2deg); } 20% { clip: rect(80px, 9999px, 80px, 0); transform: skew(0.5deg); } 25%, 30% { clip: rect(10px, 9999px, 75px, 0); transform: skew(-0.8deg); } 35% { clip: rect(60px, 9999px, 25px, 0); transform: skew(0.4deg); } 40%, 100% { clip: rect(98px, 9999px, 86px, 0); transform: skew(0.3deg);} }
+        @keyframes glitch-anim-2 { 0% { clip: rect(15px, 9999px, 99px, 0); transform: skew(-0.2deg);} 4% { clip: rect(78px, 9999px, 23px, 0); transform: skew(-0.5deg);} 9% { clip: rect(45px, 9999px, 65px, 0); transform: skew(0.3deg); } 14% { clip: rect(55px, 9999px, 40px, 0); transform: skew(-0.6deg); } 19%, 24% { clip: rect(5px, 9999px, 85px, 0); transform: skew(0.8deg); } 29% { clip: rect(70px, 9999px, 15px, 0); transform: skew(-0.4deg); } 34%, 100% { clip: rect(50px, 9999px, 30px, 0); transform: skew(-0.2deg);} }
+        .glitch-click { animation: glitchClickAnim 0.4s ease-out; }
+        @keyframes glitchClickAnim { 0% { transform: translate(0); filter: hue-rotate(0deg); } 25% { transform: translate(4px, -2px) skewX(-8deg); filter: hue-rotate(60deg); } 50% { transform: translate(-3px, 3px) skewX(5deg); filter: hue-rotate(-60deg); } 75% { transform: translate(2px, -1px) skewX(-3deg); filter: hue-rotate(30deg); } 100% { transform: translate(0); filter: hue-rotate(0deg); } }
+
+        /* --- Click Effects --- */
+        .ripple { position: fixed; border: 2px solid rgba(0, 255, 65, 0.7); border-radius: 50%; transform: translate(-50%, -50%) scale(0); animation: ripple-effect 0.8s cubic-bezier(0.1, 0.8, 0.2, 1) forwards; pointer-events: none; z-index: 9999; mix-blend-mode: screen; }
+        .ripple.mini-ripple { border-width: 1px; animation-duration: 0.6s; opacity: 0.6; }
+        @keyframes ripple-effect { to { transform: translate(-50%, -50%) scale(4); opacity: 0; } }
+        .emp-pulse { position: fixed; width: 10px; height: 10px; border-radius: 50%; transform: translate(-50%, -50%) scale(0.1); animation: emp-pulse-anim 0.8s cubic-bezier(0.1, 0.7, 1.0, 0.1) forwards; pointer-events: none; z-index: 10000; mix-blend-mode: screen; /* BG/Shadow set by JS */ }
+        @keyframes emp-pulse-anim { 0% { transform: translate(-50%, -50%) scale(0.1); opacity: 1; } 80% { opacity: 0.5; } 100% { transform: translate(-50%, -50%) scale(30); opacity: 0; } }
+        .click-shockwave { position: fixed; border-radius: 50%; transform: translate(-50%, -50%) scale(0); opacity: 1; animation: shockwave-effect 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; pointer-events: none; z-index: 9998; mix-blend-mode: screen; /* Border/BG/Shadow set by JS */ }
+        @keyframes shockwave-effect { 0% { transform: translate(-50%, -50%) scale(0.1); opacity: 1; border-width: 4px; } 70% { opacity: 0.5; border-width: 2px; } 100% { transform: translate(-50%, -50%) scale(6); opacity: 0; border-width: 1px; } }
+
+        /* --- Particle Effects --- */
+        .digital-particle { position: fixed; font-family: 'Share Tech Mono', monospace; pointer-events: none; z-index: 10001; transform-origin: center; mix-blend-mode: screen; opacity: 1; font-size: 1em; /* Color/shadow by JS */ }
+        .typing-particle { position: absolute; font-family: 'Share Tech Mono', monospace; pointer-events: none; z-index: 10001; opacity: 1; /* Color/shadow by JS */ font-size: 0.8em; mix-blend-mode: lighten; }
+        .firework-particle { position: absolute; font-family: 'Share Tech Mono', monospace; pointer-events: none; z-index: 10002; opacity: 1; text-shadow: 0 0 6px hsla(var(--particle-hue, 120), 100%, 70%, 0.7); /* Use HSL */ font-size: 0.9em; mix-blend-mode: lighten; /* Color set by JS */ }
+
+        /* --- Shake Animation --- */
+        @keyframes shake-parallax { 0%, 100% { transform: var(--current-transform, translateZ(5px)) translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: var(--current-transform, translateZ(5px)) translateX(-8px); } 20%, 40%, 60%, 80% { transform: var(--current-transform, translateZ(5px)) translateX(8px); } }
+        .shake { animation: shake-parallax 0.5s ease-in-out; }
+
+        /* --- Hidden Span for Measurement --- */
+        .measurement-span { position: absolute; visibility: hidden; height: auto; width: auto; white-space: pre; left: -9999px; top: -9999px; display: inline-block; }
 
-        /* DNA Helix Effect */
-        .dna-strand {
-            position: absolute;
-            width: 2px;
-            height: 100%;
-            left: var(--x);
-            top: 0;
-            transform-style: preserve-3d;
-            animation: dnaRotate 3s linear infinite;
-        }
-
-        .dna-particle {
-            position: absolute;
-            width: 4px;
-            height: 4px;
-            background: var(--matrix-green);
-            border-radius: 50%;
-            box-shadow: 0 0 8px var(--glow-color);
-            animation: dnaOrbit 3s linear infinite;
-        }
-
-        @keyframes dnaRotate {
-            to { transform: rotateY(360deg); }
-        }
-
-        @keyframes dnaOrbit {
-            0% { transform: rotateY(0) translateX(10px); }
-            100% { transform: rotateY(360deg) translateX(10px); }
-        }
-
-        /* Reality Glitch */
-        .reality-glitch {
-            position: absolute;
-            inset: 0;
-            background: transparent;
-            mix-blend-mode: color-dodge;
-            animation: realityShift 0.5s steps(2) infinite;
-            pointer-events: none;
-            z-index: 10;
-        }
-
-        @keyframes realityShift {
-            0% { 
-                clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
-                transform: translate(0);
-            }
-            25% {
-                clip-path: polygon(0 15%, 100% 5%, 100% 85%, 0 95%);
-                transform: translate(-5px, 2px);
-            }
-            50% {
-                clip-path: polygon(0 5%, 100% 15%, 100% 95%, 0 85%);
-                transform: translate(5px, -2px);
-            }
-            75% {
-                clip-path: polygon(0 10%, 100% 0%, 100% 90%, 0 100%);
-                transform: translate(-3px, 1px);
-            }
-            100% {
-                clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
-                transform: translate(0);
-            }
-        }
-
-        /* Neural Network Visualization */
-        .neural-node {
-            position: absolute;
-            width: 4px;
-            height: 4px;
-            background: var(--matrix-green);
-            border-radius: 50%;
-            box-shadow: 0 0 15px var(--glow-color);
-            opacity: 0.8;
-            transition: all 0.3s ease;
-        }
-
-        .neural-connection {
-            position: absolute;
-            height: 1px;
-            background: linear-gradient(90deg, 
-                transparent,
-                var(--matrix-green),
-                transparent
-            );
-            animation: pulseConnection 1s ease-in-out infinite;
-            transform-origin: left;
-        }
-
-        @keyframes pulseConnection {
-            0%, 100% { opacity: 0.3; height: 1px; }
-            50% { opacity: 1; height: 2px; }
-        }
-
-        /* Electric Arcs */
-        .electric-arc {
-            position: absolute;
-            background: linear-gradient(90deg, 
-                transparent,
-                var(--matrix-green),
-                #fff,
-                var(--matrix-green),
-                transparent
-            );
-            height: 2px;
-            filter: blur(1px);
-            animation: arcFlash 0.2s ease-out;
-            transform-origin: left;
-            opacity: 0.7;
-        }
-
-        @keyframes arcFlash {
-            0% { transform: scaleX(0); opacity: 1; }
-            100% { transform: scaleX(1); opacity: 0; }
-        }
-
-        /* Holographic Ripples */
-        .holo-ripple {
-            position: absolute;
-            border: 1px solid var(--matrix-green);
-            border-radius: 50%;
-            animation: holoExpand 1s ease-out;
-            pointer-events: none;
-        }
-
-        @keyframes holoExpand {
-            0% {
-                width: 0;
-                height: 0;
-                opacity: 1;
-                border-width: 2px;
-                transform: translate(-50%, -50%) rotate(0deg);
-            }
-            100% {
-                width: 200px;
-                height: 200px;
-                opacity: 0;
-                border-width: 1px;
-                transform: translate(-50%, -50%) rotate(180deg);
-            }
-        }
-
-        /* Digital Decomposition */
-        .decompose-particle {
-            position: absolute;
-            font-family: 'Share Tech Mono', monospace;
-            color: var(--matrix-green);
-            text-shadow: 0 0 5px var(--glow-color);
-            animation: decomposeFloat 1s ease-out;
-            pointer-events: none;
-        }
-
-        @keyframes decomposeFloat {
-            0% {
-                transform: translate(0, 0) rotate(0deg);
-                opacity: 1;
-            }
-            100% {
-                transform: translate(
-                    calc(var(--x-offset) * 50px),
-                    calc(var(--y-offset) * 50px)
-                ) rotate(calc(var(--rotation) * 360deg));
-                opacity: 0;
-            }
-        }
-
-        /* Essential effect styles */
-        .matrix-cursor-particle {
-            position: absolute; /* Changed from fixed to absolute */
-            color: var(--matrix-green);
-            font-size: 16px;
-            text-shadow: 0 0 8px var(--glow-color);
-            pointer-events: none;
-            z-index: -1; /* Place under text */
-            animation: particleFall 1s ease-out forwards;
-        }
-
-        .electric-arc {
-            position: fixed;
-            height: 2px;
-            background: linear-gradient(90deg, 
-                transparent,
-                var(--matrix-green),
-                white,
-                var(--matrix-green),
-                transparent
-            );
-            filter: blur(1px);
-            animation: arcFlash 0.2s ease-out forwards;
-            z-index: 1000;
-        }
-
-        .dna-strand {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 999;
-        }
-
-        @keyframes particleFall {
-            0% { 
-                transform: translateY(0) scale(1);
-                opacity: 1;
-            }
-            100% { 
-                transform: translateY(50px) scale(0);
-                opacity: 0;
-            }
-        }
-
-        @keyframes arcFlash {
-            0% { transform: scaleX(0); opacity: 1; }
-            100% { transform: scaleX(1); opacity: 0; }
-        }
-
-        .search-box.active {
-            animation: none !important;
-            transform: scale(1.02);
-            box-shadow: 
-                0 0 30px var(--glow-color),
-                0 0 60px var(--glow-color),
-                inset 0 0 20px rgba(0, 255, 0, 0.2);
-            border-color: #00ff00;
-        }
-
-        .search-box.typing {
-            animation: pulseEffect 0.15s ease-out !important;
-        }
-
-        @keyframes pulseEffect {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.02); }
-            100% { transform: scale(1); }
-        }
     </style>
 </head>
 <body>
-    <canvas id="matrixCanvas"></canvas>
+    <!-- Iframe -->
+    <iframe id="matrix-iframe" src="http://localhost:5000/matrix-animation.html"></iframe>
+    <!-- Overlays -->
     <div class="scanline"></div>
-
-    <div class="background-effects">
-        <!-- Particles will be added here by JS -->
-    </div>
     <div class="vignette"></div>
-
-    <!-- Add cursor elements before other content -->
+    <!-- Cursor -->
     <div class="custom-cursor">
         <div class="cursor-ring"></div>
         <div class="cursor-dot"></div>
     </div>
-
+    <!-- Main Content -->
     <div class="parallax-container">
         <div class="content-wrapper">
+            <!-- Search -->
             <div class="search-container">
-                <form id="searchForm">
-                    <input type="text" class="search-box" />
+                <form id="searchForm" autocomplete="off">
+                    <input type="text" id="searchQuery" class="search-box" placeholder="" />
                 </form>
-                <div class="domain-label">ACTIVE PROTOCOL: <span id="activeDomain" class="glitch-text" data-text="--">--</span></div>
             </div>
-
-            <div class="timer">
-                <div class="timer-label glitch-text" data-text="SESSION TIME REMAINING">SESSION TIME REMAINING</div>
-                <div id="countdown" class="glitch-text" data-text="00:00:00">00:00:00</div>
+            <!-- Timer -->
+            <div class="timer-container">
+                 <div class="timer">
+                    <div class="timer-label glitch-text" data-text="SESSION LOCK ACTIVE">SESSION LOCK ACTIVE</div>
+                    <div id="countdown" class="glitch-text" data-text="--:--:--">--:--:--</div>
+                     <div class="domain-label">TARGET: <span id="activeDomain" class="glitch-text" data-text="---">---</span></div>
+                </div>
             </div>
-        </div>
-    </div>
+        </div><!-- /content-wrapper -->
+    </div><!-- /parallax-container -->
 
+    <!-- Scripts -->
     <script src="newtab.js"></script>
-
-    <!-- Add SVG filters at the end of body -->
-    <svg style="position: absolute; width: 0; height: 0;">
-        <defs>
-            <filter id="glow">
-                <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-                <feMerge>
-                    <feMergeNode in="coloredBlur"/>
-                    <feMergeNode in="SourceGraphic"/>
-                </feMerge>
-            </filter>
-            
-            <filter id="rgb-split">
-                <feOffset in="SourceGraphic" dx="2" dy="0" result="red"/>
-                <feOffset in="SourceGraphic" dx="-2" dy="0" result="blue"/>
-                <feBlend mode="screen" in="red" in2="blue"/>
-            </filter>
-        </defs>
+    <!-- SVG -->
+    <svg style="position: absolute; width: 0; height: 0; overflow: hidden;">
+        <defs><filter id="matrix-glow"><feGaussianBlur stdDeviation="2.5" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
     </svg>
+    <!-- Measurement Span -->
+    <span class="measurement-span" id="text-measure-span"></span>
 </body>
 </html>

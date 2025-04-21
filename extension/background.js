@@ -1,3 +1,19 @@
+// Add a wrapper function for runtime.sendMessage to handle missing receivers gracefully
+function sendMessageSafely(message) {
+    try {
+        chrome.runtime.sendMessage(message, response => {
+            const lastError = chrome.runtime.lastError;
+            if (lastError) {
+                // This will happen normally when popup isn't open - don't treat as an error
+                console.log('Expected messaging error (receiver likely not active):', lastError.message);
+            }
+            return response;
+        });
+    } catch (e) {
+        console.log('Failed to send message:', e);
+    }
+}
+
 // Track analyzing state
 let isAnalyzing = false;
 let activeUrls = new Set();
@@ -133,12 +149,12 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
                 console.log('URL is blocked:', tab.url);
                 
                 // Send update to popup
-                chrome.runtime.sendMessage({
+                sendMessageSafely({
                     type: 'URL_ANALYSIS_UPDATE',
                     url: tab.url,
                     action: 'blocked',
                     reason: blockedUrls[urlKey].reason
-                }).catch(e => console.log('Message send failed (expected if popup not open):', e.message));
+                });
                 
                 // Redirect to block page if not already there with the correct reason
                 if (getBlockPageReason(tab.url) !== 'blocked') {
@@ -169,12 +185,12 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
             } else if (allowedUrls && allowedUrls[urlKey]) {
                 // URL is already allowed, just send update to popup
                 console.log('URL already allowed:', tab.url);
-                chrome.runtime.sendMessage({
+                sendMessageSafely({
                     type: 'URL_ANALYSIS_UPDATE',
                     url: tab.url,
                     action: 'allowed',
                     reason: allowedUrls[urlKey].reason || 'Content is productive'
-                }).catch(e => console.log('Message send failed (expected if popup not open):', e.message));
+                });
             }
 
         } else {
@@ -254,11 +270,11 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
             else if (directVisits[urlKey]) updateData = { action: directVisits[urlKey].isProductive ? 'allowed' : 'blocked', reason: directVisits[urlKey].reason, directVisit: true };
             
             if (updateData.action) {
-                 chrome.runtime.sendMessage({
+                sendMessageSafely({
                     type: 'URL_ANALYSIS_UPDATE',
                     url: details.url,
                     ...updateData
-                }).catch(e => console.log('Message send failed (expected if popup not open):', e.message));
+                });
             }
             return;
         }
@@ -294,7 +310,8 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
             referrer.includes('google.com/search') ||
             referrer.includes('bing.com/search') ||
             referrer.includes('duckduckgo.com') ||
-            referrer.includes('brave.com/search') // Added Brave Search
+            referrer.includes('brave.com/search') ||
+            referrer.includes('startpage.com/sp/search') // Updated to specifically check for Startpage search URLs
         );
 
         if (isLikelySearchClick) {
@@ -359,20 +376,20 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
             // Send update to popup
             try {
                 // Method 1: Standard message
-                chrome.runtime.sendMessage({
+                sendMessageSafely({
                     type: 'URL_ANALYSIS_UPDATE',
                     url: url,
                     action: 'allowed',
                     reason: result.explanation,
                     directVisit: true
-                }).catch(e => console.log('Message send failed (expected if popup not open):', e.message));
+                });
                 
                 // Method 2: Also send URL_ALLOWED message like from block.js
-                chrome.runtime.sendMessage({
+                sendMessageSafely({
                     type: 'URL_ALLOWED',
                     url: url,
                     reason: result.explanation
-                }).catch(e => console.log('URL_ALLOWED message failed (expected if popup not open):', e.message));
+                });
             } catch (e) {
                 console.log('Error sending messages to popup (this is normal if popup is not open):', e);
             }
@@ -392,20 +409,20 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
             // Send update to popup
             try {
                 // Method 1: Standard message
-                chrome.runtime.sendMessage({
+                sendMessageSafely({
                     type: 'URL_ANALYSIS_UPDATE',
                     url: url,
                     action: 'blocked',
                     reason: result.explanation,
                     directVisit: true
-                }).catch(e => console.log('Message send failed (expected if popup not open):', e.message));
+                });
                 
                 // Method 2: Also send URL_BLOCKED message like from block.js
-                chrome.runtime.sendMessage({
+                sendMessageSafely({
                     type: 'URL_BLOCKED',
                     url: url,
                     reason: result.explanation
-                }).catch(e => console.log('URL_BLOCKED message failed (expected if popup not open):', e.message));
+                });
             } catch (e) {
                 console.log('Error sending messages to popup (this is normal if popup is not open):', e);
             }
@@ -453,7 +470,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 activeUrls.delete(message.url);
                 
                 // Notify popup about URL analysis update
-                chrome.runtime.sendMessage({
+                sendMessageSafely({
                     type: 'URL_ANALYSIS_UPDATE',
                     url: message.url,
                     action: 'blocked',
@@ -484,7 +501,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 activeUrls.delete(message.url);
                 
                 // Notify popup about URL analysis update
-                chrome.runtime.sendMessage({
+                sendMessageSafely({
                     type: 'URL_ANALYSIS_UPDATE',
                     url: message.url,
                     action: 'allowed',
@@ -680,20 +697,20 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
             // Send update to popup - force this with multiple methods
             try {
                 // Method 1: Standard message
-                chrome.runtime.sendMessage({
+                sendMessageSafely({
                     type: 'URL_ANALYSIS_UPDATE',
                     url: url,
                     action: 'allowed',
                     reason: result.explanation,
                     directVisit: true
-                }).catch(e => console.log('Message send failed (expected if popup not open):', e.message));
+                });
                 
                 // Method 2: Also send URL_ALLOWED message like from block.js
-                chrome.runtime.sendMessage({
+                sendMessageSafely({
                     type: 'URL_ALLOWED',
                     url: url,
                     reason: result.explanation
-                }).catch(e => console.log('URL_ALLOWED message failed (expected if popup not open):', e.message));
+                });
             } catch (e) {
                 console.log('Error sending messages to popup (this is normal if popup is not open):', e);
             }
@@ -714,20 +731,20 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
             // Send update to popup
             try {
                 // Method 1: Standard message
-                chrome.runtime.sendMessage({
+                sendMessageSafely({
                     type: 'URL_ANALYSIS_UPDATE',
                     url: url,
                     action: 'blocked',
                     reason: result.explanation,
                     directVisit: true
-                }).catch(e => console.log('Message send failed (expected if popup not open):', e.message));
+                });
                 
                 // Method 2: Also send URL_BLOCKED message like from block.js
-                chrome.runtime.sendMessage({
+                sendMessageSafely({
                     type: 'URL_BLOCKED',
                     url: url,
                     reason: result.explanation
-                }).catch(e => console.log('URL_BLOCKED message failed (expected if popup not open):', e.message));
+                });
             } catch (e) {
                 console.log('Error sending messages to popup (this is normal if popup is not open):', e);
             }

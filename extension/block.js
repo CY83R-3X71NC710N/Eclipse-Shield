@@ -1,3 +1,20 @@
+// Add safe messaging helper function to handle missing receivers gracefully
+function sendMessageSafely(message, callback) {
+    try {
+        chrome.runtime.sendMessage(message, response => {
+            const lastError = chrome.runtime.lastError;
+            if (lastError) {
+                // This will happen normally when no listeners - don't treat as an error
+                console.log('Expected messaging error (receiver likely not active):', lastError.message);
+            } else if (callback) {
+                callback(response);
+            }
+        });
+    } catch (e) {
+        console.log('Failed to send message:', e);
+    }
+}
+
 // Simplified cursor handling
 document.addEventListener('DOMContentLoaded', () => {
     const cursor = document.querySelector('.custom-cursor');
@@ -200,7 +217,7 @@ async function handleAnalysis(url, originalUrl, domain, sessionData) {
             displayBlockedInfo(url, result.explanation);
             
             // Notify background script about blocked URL
-            chrome.runtime.sendMessage({
+            sendMessageSafely({
                 type: 'URL_BLOCKED',
                 url: originalUrl,
                 reason: result.explanation
@@ -219,7 +236,7 @@ function handleAnalysisResult(result, url, originalUrl) {
     if (typeof result === 'object' && 'isProductive' in result) {
         if (result.isProductive) {
             // Mark as allowed and redirect
-            chrome.runtime.sendMessage({
+            sendMessageSafely({
                 type: 'URL_ALLOWED',
                 url: originalUrl
             }, () => {
@@ -231,7 +248,7 @@ function handleAnalysisResult(result, url, originalUrl) {
             displayBlockedInfo(url, result.explanation);
             
             // Store both original and normalized URLs
-            chrome.runtime.sendMessage({
+            sendMessageSafely({
                 type: 'URL_BLOCKED',
                 url: originalUrl,
                 normalizedUrl: normalizeUrl(originalUrl),
@@ -241,7 +258,7 @@ function handleAnalysisResult(result, url, originalUrl) {
     } else {
         // Handle legacy format
         if (result) {
-            chrome.runtime.sendMessage({
+            sendMessageSafely({
                 type: 'URL_ALLOWED',
                 url: originalUrl
             }, () => {
@@ -252,7 +269,7 @@ function handleAnalysisResult(result, url, originalUrl) {
             showSection('blocked');
             displayBlockedInfo(url, "Content not relevant to current task");
             
-            chrome.runtime.sendMessage({
+            sendMessageSafely({
                 type: 'URL_BLOCKED',
                 url: originalUrl,
                 reason: "Content not relevant to current task"

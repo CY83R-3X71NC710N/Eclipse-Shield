@@ -391,8 +391,8 @@ class ProductivityAnalyzer:
             netloc_lower = signals['hostname']
             path_lower = parsed.path.lower()
 
-            signals['is_search'] = any(term in netloc_lower for term in ['search.', 'google.', 'bing.', 'duckduckgo.']) or \
-                                   any(term in path_lower for term in ['/search', '/s/', '/find']) or \
+            signals['is_search'] = any(term in netloc_lower for term in ['search.', 'google.', 'bing.', 'duckduckgo.', 'startpage.']) or \
+                                   any(term in path_lower for term in ['/search', '/s/', '/find', '/sp/search']) or \
                                    signals['search_query'] is not None
 
             signals['is_educational'] = any(term in netloc_lower for term in ['.edu', '.ac.', 'school', 'learn', 'course', 'study', 'academic', 'khanacademy', 'coursera', 'udemy']) or \
@@ -533,7 +533,7 @@ class ProductivityAnalyzer:
             return 'documentation/reference'
         if any(term in hostname for term in ['github.com', 'gitlab.com', 'bitbucket.org', 'dev.azure', 'dev.to']):
              return 'development/code'
-        if any(term in hostname for term in ['google.com', 'bing.com', 'duckduckgo.com', 'search.']): # Add specific search engines
+        if any(term in hostname for term in ['google.com', 'bing.com', 'duckduckgo.com', 'startpage.com', 'search.']): # Add specific search engines
              if 'google.com' in hostname and any(sub in hostname for sub in ['docs.', 'sheets.', 'slides.', 'drive.', 'mail.', 'calendar.']):
                   return 'productivity/tools' # Google Workspace tools are productivity
              return 'search engine'
