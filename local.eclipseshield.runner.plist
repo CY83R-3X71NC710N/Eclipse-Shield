@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>local.eclipseshield.runner</string> <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-c</string>
+        <string>export PATH="/Users/gavin/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH" &amp;&amp; python3 app.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/gavin/Eclipse-Shield</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/gavin/Library/Logs/local.eclipseshield.runner.stderr.log</string>
+    <key>StandardOutPath</key>
+    <string>/Users/gavin/Library/Logs/local.eclipseshield.runner.stdout.log</string>
+
+</dict>
+</plist>
