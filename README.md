@@ -23,6 +23,13 @@ To install Eclipse Shield, follow these steps:
    pip install -r requirements.txt
    ```
 
+# Instructions Creating a PLIST:
+```
+cp ./local.eclipseshield.runner.plist ~/Library/LaunchAgents/
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.eclipseshield.runner.plist
+```
+When popped up grant the permissions needed to bash
+
 ## Usage
 
 To use Eclipse Shield, follow these steps:
