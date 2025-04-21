@@ -466,6 +466,13 @@ def cleanup_cache_thread_func():
 cleanup_thread = threading.Thread(target=cleanup_cache_thread_func, daemon=True)
 cleanup_thread.start()
 
+@app.route('/update.xml')
+def serve_update_xml():
+    try:
+        return send_from_directory('.', 'update.xml')
+    except Exception as e:
+        app.logger.error(f"Error serving update.xml: {e}")
+        return "Error loading update.xml", 500
 
 # --- Main Execution Block ---
 if __name__ == '__main__':
