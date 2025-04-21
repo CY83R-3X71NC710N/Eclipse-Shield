@@ -61,10 +61,6 @@ We welcome contributions to Eclipse Shield! To contribute, follow these steps:
    ```
 5. Open a pull request on the main repository.
 
-## Contact Information
-
-For any questions or inquiries, please contact us at [support@eclipseshield.com](mailto:support@eclipseshield.com).
-
 ## Copyright
 
 © 2025 CY83R-3X71NC710N. All rights reserved.
