@@ -33,3 +33,6 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./
         publish_branch: gh-pages
+
+    - name: Capture and output URL of deployed site
+      run: echo "url=https://${{ github.repository_owner }}.github.io/${{ github.repository }}" >> $GITHUB_ENV
