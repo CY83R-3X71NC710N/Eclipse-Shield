@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Eclipse Shield - Message Passing Test</title>
+    <style>
+        body {
+            font-family: 'Share Tech Mono', monospace;
+            background: #000;
+            color: #0f0;
+            padding: 20px;
+        }
+        .log {
+            border: 1px solid #0f0;
+            padding: 10px;
+            margin: 10px 0;
+            background: rgba(0, 20, 0, 0.3);
+            height: 300px;
+            overflow-y: auto;
+        }
+        iframe {
+            border: 2px solid #0f0;
+            width: 500px;
+            height: 300px;
+        }
+        button {
+            background: rgba(0, 20, 0, 0.8);
+            color: #0f0;
+            border: 1px solid #0f0;
+            padding: 10px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Eclipse Shield - Message Passing Test</h1>
+    
+    <div>
+        <button onclick="testDirectAccess()">Test Direct Access</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+    
+    <div class="log" id="log"></div>
+    
+    <iframe id="popup-frame" sandbox="allow-scripts allow-same-origin allow-forms" src="http://localhost:5000/ext-popup"></iframe>
+    
+    <script>
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}<br>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        function testDirectAccess() {
+            log('Testing direct access to popup frame...');
+            const frame = document.getElementById('popup-frame');
+            
+            // Test if frame loaded
+            log('Frame src: ' + frame.src);
+            log('Frame content window: ' + (frame.contentWindow ? 'Available' : 'Not available'));
+            
+            // Try to access iframe document
+            try {
+                const iframeDoc = frame.contentDocument || frame.contentWindow.document;
+                log('Iframe document: ' + (iframeDoc ? 'Accessible' : 'Not accessible'));
+                
+                if (iframeDoc) {
+                    const buttons = iframeDoc.querySelectorAll('button');
+                    log(`Found ${buttons.length} buttons in iframe`);
+                    buttons.forEach((btn, i) => {
+                        log(`Button ${i}: id="${btn.id}", text="${btn.textContent.trim()}"`);
+                    });
+                }
+            } catch (e) {
+                log('Cross-origin restriction (expected): ' + e.message);
+            }
+        }
+        
+        // Listen for messages from the iframe
+        window.addEventListener('message', function(event) {
+            if (event.origin !== 'http://localhost:5000') {
+                log('Ignored message from origin: ' + event.origin);
+                return;
+            }
+            
+            log('Received message from iframe: ' + JSON.stringify(event.data));
+            
+            // Handle storage requests from iframe
+            if (event.data.type === 'storage-get') {
+                const responsePort = event.ports[0];
+                log('Handling storage-get request for keys: ' + JSON.stringify(event.data.keys));
+                
+                // Mock response
+                responsePort.postMessage({
+                    type: 'storage-response',
+                    result: {}
+                });
+                responsePort.close();
+                log('Sent mock storage response');
+            }
+            
+            if (event.data.type === 'storage-set') {
+                const responsePort = event.ports[0];
+                log('Handling storage-set request with items: ' + JSON.stringify(event.data.items));
+                
+                // Mock response
+                responsePort.postMessage({
+                    type: 'storage-response'
+                });
+                responsePort.close();
+                log('Sent mock storage set confirmation');
+            }
+        });
+        
+        // Test when iframe loads
+        document.getElementById('popup-frame').onload = function() {
+            log('Iframe loaded successfully');
+            
+            // Try sending a test message
+            setTimeout(() => {
+                log('Sending test message to iframe...');
+                try {
+                    this.contentWindow.postMessage({
+                        type: 'TEST_MESSAGE',
+                        data: 'Hello from parent'
+                    }, 'http://localhost:5000');
+                    log('Test message sent');
+                } catch (e) {
+                    log('Error sending test message: ' + e.message);
+                }
+            }, 1000);
+        };
+        
+        document.getElementById('popup-frame').onerror = function() {
+            log('Iframe failed to load');
+        };
+        
+        log('Parent window initialized and listening for messages');
+    </script>
+</body>
+</html>

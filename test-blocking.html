@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Eclipse Shield Blocking</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status.success { background-color: #d4edda; color: #155724; }
+        .status.error { background-color: #f8d7da; color: #721c24; }
+        .status.warning { background-color: #fff3cd; color: #856404; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .test-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .test-links a {
+            display: inline-block;
+            padding: 8px 16px;
+            background: #6c757d;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .test-links a:hover {
+            background: #495057;
+        }
+    </style>
+</head>
+<body>
+    <h1>🛡️ Eclipse Shield - Blocking Test</h1>
+    
+    <div class="test-section">
+        <h2>Extension Blocking Test</h2>
+        <div class="status warning">
+            <strong>Expected Behavior:</strong> If no block session is active, ALL external websites should be blocked and redirect to block.html
+        </div>
+        
+        <h3>Test Links (Should be blocked if no session active):</h3>
+        <div class="test-links">
+            <a href="https://www.google.com" target="_blank">Google</a>
+            <a href="https://www.youtube.com" target="_blank">YouTube</a>
+            <a href="https://www.github.com" target="_blank">GitHub</a>
+            <a href="https://www.stackoverflow.com" target="_blank">Stack Overflow</a>
+            <a href="https://www.wikipedia.org" target="_blank">Wikipedia</a>
+            <a href="https://www.reddit.com" target="_blank">Reddit</a>
+        </div>
+        
+        <h3>Extension URLs (Should NOT be blocked):</h3>
+        <div class="test-links">
+            <a href="popup.html" target="_blank">Extension Popup</a>
+            <a href="block.html" target="_blank">Block Page</a>
+            <a href="newtab.html" target="_blank">New Tab Page</a>
+        </div>
+        
+        <h3>Testing Instructions:</h3>
+        <ol>
+            <li><strong>Without active session:</strong> Click any test link above - should redirect to block.html</li>
+            <li><strong>Type any URL in address bar</strong> - should be blocked</li>
+            <li><strong>Open new tab</strong> - should redirect to extension new tab page</li>
+            <li><strong>Start a block session via extension popup</strong></li>
+            <li><strong>Try links again</strong> - behavior should change based on session settings</li>
+        </ol>
+    </div>
+    
+    <div class="test-section">
+        <h2>Session Status</h2>
+        <div id="session-status" class="status">Checking session status...</div>
+        <button onclick="checkSession()">Refresh Session Status</button>
+        <button onclick="clearSession()">Clear Session (Should block all tabs)</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>Console Log</h2>
+        <div id="console-output" style="background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 100px; font-family: monospace; font-size: 12px;">
+            Console output will appear here...
+        </div>
+        <button onclick="clearConsole()">Clear Console</button>
+    </div>
+
+    <script>
+        let consoleOutput = document.getElementById('console-output');
+        
+        // Override console.log to capture output
+        const originalLog = console.log;
+        console.log = function(...args) {
+            originalLog.apply(console, arguments);
+            const timestamp = new Date().toLocaleTimeString();
+            consoleOutput.innerHTML += `[${timestamp}] ${args.join(' ')}\n`;
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        };
+        
+        function checkSession() {
+            console.log('Checking session status...');
+            try {
+                chrome.storage.local.get(['sessionData'], (data) => {
+                    const statusDiv = document.getElementById('session-status');
+                    if (data.sessionData && data.sessionData.state === 'active') {
+                        statusDiv.className = 'status success';
+                        statusDiv.innerHTML = `✅ Active Session: ${data.sessionData.domain || 'Unknown'} context`;
+                        console.log('Session active:', data.sessionData);
+                    } else {
+                        statusDiv.className = 'status error';
+                        statusDiv.innerHTML = '❌ No Active Session - All browsing should be blocked';
+                        console.log('No active session:', data.sessionData);
+                    }
+                });
+            } catch (error) {
+                console.log('Error checking session:', error);
+                document.getElementById('session-status').innerHTML = '⚠️ Error accessing extension storage';
+            }
+        }
+        
+        function clearSession() {
+            console.log('Clearing session data...');
+            try {
+                chrome.storage.local.remove(['sessionData'], () => {
+                    console.log('Session cleared - all tabs should be blocked');
+                    checkSession();
+                });
+            } catch (error) {
+                console.log('Error clearing session:', error);
+            }
+        }
+        
+        function clearConsole() {
+            consoleOutput.innerHTML = '';
+        }
+        
+        // Check session on page load
+        window.addEventListener('load', () => {
+            setTimeout(checkSession, 500);
+        });
+        
+        console.log('Eclipse Shield blocking test page loaded');
+    </script>
+</body>
+</html>

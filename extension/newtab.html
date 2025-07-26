@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>New Tab</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- DNS prefetch and preconnect for faster search engine access -->
+    <link rel="dns-prefetch" href="//duckduckgo.com">
+    <link rel="preconnect" href="https://duckduckgo.com" crossorigin>
+    
+    <style>
+        /* Local Font */
+        @font-face {
+            font-family: 'Share Tech Mono';
+            font-style: normal;
+            font-weight: 400;
+            font-display: swap;
+            src: local('Share Tech Mono'),
+                 url('assets/ShareTechMono-Regular.woff2') format('woff2'),
+                 url('https://fonts.gstatic.com/s/sharetechmono/v15/J7aHnp1uDWRBEqV98dVQztYldFcLowEFA87Heg.woff2') format('woff2');
+        }
+
+        :root {
+            --matrix-green: #00ff41;
+            --glow-color: rgba(0, 255, 65, 0.7);
+            --dark-bg: #000500;
+            --placeholder-size: 1.8rem;
+            --search-transition-speed: 0.6s;
+            --max-expanded-width: 96vw;
+            /* Parallax Configuration */
+            --perspective: 900px;
+            --parallax-sensitivity: 0.06;
+            --parallax-max-rotate: 18deg;
+            --parallax-transition-speed: 0.1s;
+            /* Effects Configuration */
+            --rgb-border-speed: 1.5s;
+        }
+
+        /* UPDATED: Aggressive Cursor Hiding */
+        * { margin: 0; padding: 0; box-sizing: border-box; cursor: none !important; } /* Added !important */
+        html, body { height: 100%; width: 100%; cursor: none !important; } /* Added !important */
+
+        body {
+            background: var(--dark-bg); color: var(--matrix-green); font-family: 'Share Tech Mono', monospace;
+            min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center;
+            overflow: hidden; perspective: var(--perspective);
+        }
+
+        /* --- Matrix Background Iframe --- */
+        #matrix-iframe { position: fixed; top: 0; left: 50%; transform: translateX(-51%); width: 100%; height: 100%; border: none; z-index: 0; pointer-events: none; opacity: 1; }
+
+        /* --- Overlays --- */
+        .scanline { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, transparent 50%, rgba(0, 255, 0, 0.015) 50%); background-size: 100% 4px; z-index: 2; pointer-events: none; animation: scan 15s linear infinite; mix-blend-mode: overlay; }
+        @keyframes scan { from { background-position: 0 0; } to { background-position: 0 -500px; } }
+        .vignette { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(ellipse at center, transparent 35%, rgba(0, 5, 0, 0.8) 75%, rgba(0, 0, 0, 1) 100%); z-index: 3; pointer-events: none; }
+
+        /* --- Custom Cursor --- */
+        .custom-cursor { position: fixed; pointer-events: none; z-index: 10000; opacity: 0; transition: opacity 0.2s ease-in-out; }
+        .cursor-ring { position: fixed; width: 28px; height: 28px; border: 2px solid var(--matrix-green); border-radius: 50%; transform: translate(-50%, -50%) scale(1); pointer-events: none; transition: transform 0.2s cubic-bezier(0.1, 0.7, 0.3, 1), border-color 0.1s, box-shadow 0.1s; box-shadow: 0 0 8px rgba(0, 255, 65, 0); mix-blend-mode: screen; }
+        .cursor-dot { position: fixed; width: 5px; height: 5px; background-color: #fff; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; box-shadow: 0 0 6px #fff, 0 0 10px rgba(255, 255, 255, 0.5); }
+
+        /* --- Parallax & Content --- */
+        .parallax-container { transform-style: preserve-3d; transition: transform var(--parallax-transition-speed) ease-out; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; position: relative; z-index: 5; transform: rotateX(0deg) rotateY(0deg) translateZ(0px); }
+        .content-wrapper { position: relative; width: 100%; max-width: 1100px; padding: 2rem; text-align: center; animation: contentFadeIn 1.2s ease-out 0.3s forwards; opacity: 0; transform-style: preserve-3d; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; }
+        @keyframes contentFadeIn { from { opacity: 0; transform: translateY(25px) translateZ(-60px); } to { opacity: 1; transform: translateY(0) translateZ(0px); } }
+
+        /* --- Search Container --- */
+        .search-container { background: rgba(0, 15, 0, 0.75); padding: 2.5rem 3.5rem; border-radius: 10px; border: 1px solid rgba(0, 255, 65, 0.5); box-shadow: 0 0 25px rgba(0, 255, 65, 0.25), 0 18px 35px rgba(0, 0, 0, 0.8), inset 0 0 18px rgba(0, 255, 65, 0.15); backdrop-filter: blur(10px); transform-style: preserve-3d; width: 90%; max-width: 800px; margin: 0 auto 2.5rem auto; position: relative; overflow: hidden; transition: box-shadow 0.4s ease, border-color 0.4s ease, max-width var(--search-transition-speed) cubic-bezier(0.25, 1, 0.5, 1), padding var(--search-transition-speed) cubic-bezier(0.25, 1, 0.5, 1), transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); transform: translateZ(5px); }
+        .search-container.expanded { max-width: var(--max-expanded-width); padding: 3rem 4.5rem; transform: translateY(-5px) scale(1.01) translateZ(20px) rotateX(0deg) rotateY(0deg) !important; }
+         .search-container:hover:not(.expanded) { box-shadow: 0 0 35px rgba(0, 255, 65, 0.45), 0 0 60px rgba(0, 255, 65, 0.25), 0 25px 45px rgba(0, 0, 0, 0.85), inset 0 0 25px rgba(0, 255, 65, 0.2); border-color: rgba(0, 255, 65, 0.7); }
+
+        /* --- Search Box Input --- */
+        .search-box {
+            width: 100%; padding: 20px 30px; font-size: var(--placeholder-size);
+            line-height: 1.4; min-height: 75px; background: rgba(0, 0, 0, 0.7);
+            border: 3px solid rgba(0, 255, 65, 0.4);
+            color: var(--matrix-green); border-radius: 6px; outline: none;
+            font-family: 'Share Tech Mono', monospace; text-shadow: 0 0 6px rgba(0, 255, 65, 0.8);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6), 0 0 12px rgba(0, 255, 65, 0.15);
+            margin-bottom: 0; transform: translateZ(15px); backdrop-filter: blur(5px);
+            letter-spacing: 1px; position: relative; overflow: visible; text-align: center;
+            transition: font-size 0.25s ease-out, transform 0.3s ease, box-shadow 0.3s ease, line-height 0.25s ease-out, padding 0.25s ease-out;
+            cursor: none; /* Ensure input itself has no cursor */
+        }
+        .search-box:focus {
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 20px rgba(0, 255, 65, 0.6), 0 0 35px rgba(0, 255, 65, 0.4);
+            transform: scale(1.015) translateZ(25px);
+            cursor: none; /* Ensure input still has no cursor when focused */
+        }
+
+        /* RGB Border Animation on Typing */
+        .search-box.typing { animation: rgbBorderPulse var(--rgb-border-speed) linear infinite; }
+        @keyframes rgbBorderPulse {
+            0%   { border-color: hsl(120, 100%, 50%); box-shadow: inset 0 1px 3px rgba(0,0,0,0.4), 0 0 25px hsla(120, 100%, 50%, 0.8), 0 0 40px hsla(120, 100%, 50%, 0.6); }
+            17%  { border-color: hsl(180, 100%, 50%); box-shadow: inset 0 1px 3px rgba(0,0,0,0.4), 0 0 27px hsla(180, 100%, 50%, 0.8), 0 0 42px hsla(180, 100%, 50%, 0.6); }
+            33%  { border-color: hsl(240, 100%, 60%); box-shadow: inset 0 1px 3px rgba(0,0,0,0.4), 0 0 25px hsla(240, 100%, 60%, 0.8), 0 0 40px hsla(240, 100%, 60%, 0.6); }
+            50%  { border-color: hsl(300, 100%, 50%); box-shadow: inset 0 1px 3px rgba(0,0,0,0.4), 0 0 27px hsla(300, 100%, 50%, 0.8), 0 0 42px hsla(300, 100%, 50%, 0.6); }
+            67%  { border-color: hsl(0, 100%, 55%);   box-shadow: inset 0 1px 3px rgba(0,0,0,0.4), 0 0 25px hsla(0, 100%, 55%, 0.8),   0 0 40px hsla(0, 100%, 55%, 0.6); }
+            83%  { border-color: hsl(60, 100%, 50%);  box-shadow: inset 0 1px 3px rgba(0,0,0,0.4), 0 0 27px hsla(60, 100%, 50%, 0.8),  0 0 42px hsla(60, 100%, 50%, 0.6); }
+            100% { border-color: hsl(120, 100%, 50%); box-shadow: inset 0 1px 3px rgba(0,0,0,0.4), 0 0 25px hsla(120, 100%, 50%, 0.8), 0 0 40px hsla(120, 100%, 50%, 0.6); }
+        }
+        .search-box:not(.typing) { border-color: rgba(0, 255, 65, 0.4); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6), 0 0 12px rgba(0, 255, 65, 0.15); animation: none; }
+        .search-box:focus:not(.typing) { border-color: rgba(0, 255, 65, 0.9); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 20px rgba(0, 255, 65, 0.6), 0 0 35px rgba(0, 255, 65, 0.4); }
+
+        /* Placeholder Styling */
+        .search-box::placeholder, .search-box::-webkit-input-placeholder { font-size: inherit !important; line-height: inherit !important; color: rgba(0, 255, 65, 0.65); opacity: 1; transition: color 0.3s ease, opacity 0.3s ease; width: 100%; text-align: center; letter-spacing: inherit; position: relative; white-space: nowrap; vertical-align: middle; display: inline-block; }
+        .search-box:focus::placeholder, .search-box:focus::-webkit-input-placeholder { color: transparent; opacity: 0; }
+
+        /* Active State pulse */
+        .search-box.active { animation: activePulse 0.18s ease-out; }
+        @keyframes activePulse { 0% { transform: scale(1.015) translateZ(25px); } 50% { transform: scale(1.025) translateZ(30px); } 100% { transform: scale(1.015) translateZ(25px); } }
+
+        /* --- Timer & Domain --- */
+        .timer-container { opacity: 0; transition: opacity 0.5s ease-in-out, filter 0.2s ease-in-out; margin-top: 2.5rem; transform-style: preserve-3d; transform: translateZ(10px); }
+        .timer-container.active { opacity: 1; }
+        .timer { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; transform: translateZ(15px); }
+        .timer-label { font-size: 1rem; opacity: 0.8; text-transform: uppercase; letter-spacing: 1.5px; text-shadow: 0 0 5px rgba(0, 255, 65, 0.5); transform: translateZ(5px); }
+        #countdown { font-size: 3.5rem; font-weight: normal; letter-spacing: 3px; animation: pulse 2s ease-in-out infinite; position: relative; text-shadow: 0 0 15px rgba(0, 255, 65, 0.7), 0 0 25px rgba(0, 255, 65, 0.3); transform: translateZ(10px); }
+        .domain-label { margin-top: 0.8rem; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; color: #a0ffa0; text-shadow: 0 0 4px rgba(0, 255, 65, 0.4); transform: translateZ(5px); }
+        #activeDomain { font-weight: bold; letter-spacing: 1.5px; margin-left: 5px; display: inline-block; position: relative; }
+        @keyframes pulse { 0%, 100% { text-shadow: 0 0 15px rgba(0, 255, 65, 0.7), 0 0 25px rgba(0, 255, 65, 0.3); transform: scale(1) translateZ(10px); } 50% { text-shadow: 0 0 25px rgba(0, 255, 65, 0.9), 0 0 40px rgba(0, 255, 65, 0.5); transform: scale(1.03) translateZ(12px); } }
+
+        /* --- Glitch Effect --- */
+        .glitch-text { position: relative; }
+        .glitch-text[data-text]::before, .glitch-text[data-text]::after { content: attr(data-text); position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: inherit; color: inherit; overflow: hidden; clip: rect(0, 900px, 0, 0); pointer-events: none; }
+        .glitch-text[data-text]::before { left: 2px; text-shadow: -1px 0 #ff00ff; animation: glitch-anim-1 2.5s infinite linear alternate-reverse; }
+        .glitch-text[data-text]::after { left: -2px; text-shadow: 1px 0 #00ffff; animation: glitch-anim-2 3s infinite linear alternate-reverse; }
+        @keyframes glitch-anim-1 { 0% { clip: rect(42px, 9999px, 44px, 0); transform: skew(0.3deg);} 5% { clip: rect(17px, 9999px, 94px, 0); transform: skew(0.7deg);} 10%, 15% { clip: rect(50px, 9999px, 30px, 0); transform: skew(-0.2deg); } 20% { clip: rect(80px, 9999px, 80px, 0); transform: skew(0.5deg); } 25%, 30% { clip: rect(10px, 9999px, 75px, 0); transform: skew(-0.8deg); } 35% { clip: rect(60px, 9999px, 25px, 0); transform: skew(0.4deg); } 40%, 100% { clip: rect(98px, 9999px, 86px, 0); transform: skew(0.3deg);} }
+        @keyframes glitch-anim-2 { 0% { clip: rect(15px, 9999px, 99px, 0); transform: skew(-0.2deg);} 4% { clip: rect(78px, 9999px, 23px, 0); transform: skew(-0.5deg);} 9% { clip: rect(45px, 9999px, 65px, 0); transform: skew(0.3deg); } 14% { clip: rect(55px, 9999px, 40px, 0); transform: skew(-0.6deg); } 19%, 24% { clip: rect(5px, 9999px, 85px, 0); transform: skew(0.8deg); } 29% { clip: rect(70px, 9999px, 15px, 0); transform: skew(-0.4deg); } 34%, 100% { clip: rect(50px, 9999px, 30px, 0); transform: skew(-0.2deg);} }
+        .glitch-click { animation: glitchClickAnim 0.4s ease-out; }
+        @keyframes glitchClickAnim { 0% { transform: translate(0); filter: hue-rotate(0deg); } 25% { transform: translate(4px, -2px) skewX(-8deg); filter: hue-rotate(60deg); } 50% { transform: translate(-3px, 3px) skewX(5deg); filter: hue-rotate(-60deg); } 75% { transform: translate(2px, -1px) skewX(-3deg); filter: hue-rotate(30deg); } 100% { transform: translate(0); filter: hue-rotate(0deg); } }
+
+        /* --- Click Effects --- */
+        .ripple { position: fixed; border: 2px solid rgba(0, 255, 65, 0.7); border-radius: 50%; transform: translate(-50%, -50%) scale(0); animation: ripple-effect 0.8s cubic-bezier(0.1, 0.8, 0.2, 1) forwards; pointer-events: none; z-index: 9999; mix-blend-mode: screen; }
+        .ripple.mini-ripple { border-width: 1px; animation-duration: 0.6s; opacity: 0.6; }
+        @keyframes ripple-effect { to { transform: translate(-50%, -50%) scale(4); opacity: 0; } }
+        .emp-pulse { position: fixed; width: 10px; height: 10px; border-radius: 50%; transform: translate(-50%, -50%) scale(0.1); animation: emp-pulse-anim 0.8s cubic-bezier(0.1, 0.7, 1.0, 0.1) forwards; pointer-events: none; z-index: 10000; mix-blend-mode: screen; /* BG/Shadow set by JS */ }
+        @keyframes emp-pulse-anim { 0% { transform: translate(-50%, -50%) scale(0.1); opacity: 1; } 80% { opacity: 0.5; } 100% { transform: translate(-50%, -50%) scale(30); opacity: 0; } }
+        .click-shockwave { position: fixed; border-radius: 50%; transform: translate(-50%, -50%) scale(0); opacity: 1; animation: shockwave-effect 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; pointer-events: none; z-index: 9998; mix-blend-mode: screen; /* Border/BG/Shadow set by JS */ }
+        @keyframes shockwave-effect { 0% { transform: translate(-50%, -50%) scale(0.1); opacity: 1; border-width: 4px; } 70% { opacity: 0.5; border-width: 2px; } 100% { transform: translate(-50%, -50%) scale(6); opacity: 0; border-width: 1px; } }
+
+        /* --- Particle Effects --- */
+        .digital-particle { position: fixed; font-family: 'Share Tech Mono', monospace; pointer-events: none; z-index: 10001; transform-origin: center; mix-blend-mode: screen; opacity: 1; font-size: 1em; /* Color/shadow by JS */ }
+        .typing-particle { position: absolute; font-family: 'Share Tech Mono', monospace; pointer-events: none; z-index: 10001; opacity: 1; /* Color/shadow by JS */ font-size: 0.8em; mix-blend-mode: lighten; }
+        .firework-particle { position: absolute; font-family: 'Share Tech Mono', monospace; pointer-events: none; z-index: 10002; opacity: 1; text-shadow: 0 0 6px hsla(var(--particle-hue, 120), 100%, 70%, 0.7); /* Use HSL */ font-size: 0.9em; mix-blend-mode: lighten; /* Color set by JS */ }
+
+        /* --- Shake Animation --- */
+        @keyframes shake-parallax { 0%, 100% { transform: var(--current-transform, translateZ(5px)) translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: var(--current-transform, translateZ(5px)) translateX(-8px); } 20%, 40%, 60%, 80% { transform: var(--current-transform, translateZ(5px)) translateX(8px); } }
+        .shake { animation: shake-parallax 0.5s ease-in-out; }
+
+        /* --- Hidden Span for Measurement --- */
+        .measurement-span { position: absolute; visibility: hidden; height: auto; width: auto; white-space: pre; left: -9999px; top: -9999px; display: inline-block; }
+
+    </style>
+</head>
+<body>
+    <!-- Iframe -->
+    <iframe id="matrix-iframe" src="http://localhost:5000/matrix-animation-wrapper.html"></iframe>
+    <!-- Overlays -->
+    <div class="scanline"></div>
+    <div class="vignette"></div>
+    <!-- Cursor -->
+    <div class="custom-cursor">
+        <div class="cursor-ring"></div>
+        <div class="cursor-dot"></div>
+    </div>
+    <!-- Main Content -->
+    <div class="parallax-container">
+        <div class="content-wrapper">
+            <!-- Search -->
+            <div class="search-container">
+                <form id="searchForm" autocomplete="off">
+                    <input type="text" id="searchQuery" class="search-box" placeholder="" />
+                </form>
+            </div>
+            <!-- Timer -->
+            <div class="timer-container">
+                 <div class="timer">
+                    <div class="timer-label glitch-text" data-text="SESSION LOCK ACTIVE">SESSION LOCK ACTIVE</div>
+                    <div id="countdown" class="glitch-text" data-text="--:--:--">--:--:--</div>
+                     <div class="domain-label">TARGET: <span id="activeDomain" class="glitch-text" data-text="---">---</span></div>
+                </div>
+            </div>
+        </div><!-- /content-wrapper -->
+    </div><!-- /parallax-container -->
+
+    <!-- Scripts -->
+    <script src="newtab.js"></script>
+    <!-- SVG -->
+    <svg style="position: absolute; width: 0; height: 0; overflow: hidden;">
+        <defs><filter id="matrix-glow"><feGaussianBlur stdDeviation="2.5" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    </svg>
+    <!-- Measurement Span -->
+    <span class="measurement-span" id="text-measure-span"></span>
+</body>
+</html>

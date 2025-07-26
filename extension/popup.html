@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        @keyframes matrix-bg {
+            0% { background-position: 0 0; }
+            100% { background-position: 0 100%; }
+        }
+
+        @keyframes text-glow {
+            0% { text-shadow: 0 0 5px #ff0000, 0 0 10px #ff0000; }
+            50% { text-shadow: 0 0 15px #ff0000, 0 0 20px #ff0000; }
+            100% { text-shadow: 0 0 5px #ff0000, 0 0 10px #ff0000; }
+        }
+
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+        * {
+            cursor: none !important;
+        }
+
+        html, body {
+            width: 500px;
+            height: 300px;
+            padding: 15px;
+            margin: 0;
+            box-sizing: border-box;
+            overflow: hidden;
+            background-color: #000;
+        }
+
+        #matrix-rain {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+            opacity: 1;
+        }
+
+        body {
+            color: #0f0;
+            font-family: 'Share Tech Mono', monospace;
+            position: relative;
+            border: 1px solid #0f0;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background-color: transparent;
+        }
+
+        #domainSelect, #contextQuestions, #analysisSection {
+            position: relative;
+            z-index: 1;
+            background: rgba(0, 0, 0, 0.7);
+        }
+
+        .hidden {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+
+        #analysisSection.hidden,
+        #analysisResult.hidden,
+        #result.hidden {
+            display: none !important;
+            visibility: hidden !important;
+            position: absolute !important;
+            z-index: -1 !important;
+        }
+
+        body, button, select, input, a {
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        .custom-cursor, .cursor-dot {
+            display: none;
+        }
+
+        /* Domain section h3 */
+        #domainSelect h3 {
+            color: #0f0;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px #0f0;
+            position: relative;
+            /* overflow: hidden; Removed overflow: hidden; from h3 */
+            font-size: 16px;
+            margin-top: 5px;
+            margin-bottom: 10px;
+            /* margin-left: 200px; Center the title - REMOVED */
+            padding-bottom: 5px;
+            text-align: center; /* ADDED: Center the title text */
+        }
+
+        /* Questions section h3 */
+        #contextQuestions h3 {
+            color: #ff0000;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            text-shadow: 0 0 10px #ff0000;
+            position: relative;
+            /* overflow: hidden; Removed overflow: hidden; from h3 */
+            font-size: 18px;
+            margin-top: 8px;
+            margin-bottom: 12px;
+            margin-left: 225px; /* Center the title */
+            font-weight: bold;
+        }
+
+        /* Main content containers */
+        #domainSelect, #contextQuestions {
+            width: 100%;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        /* Analysis section styling */
+        #analysisResult {
+            position: relative;
+            width: 100%;
+            height: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 2;
+            margin: 0;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.2);
+        }
+
+        #analysisResult h3 {
+            color: #0f0;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            text-shadow: 0 0 10px #0f0;
+            margin: 30px 0 40px 0;
+            padding: 0;
+            text-align: center;
+            font-size: 36px;
+            font-weight: bold;
+            animation: text-glow 2s infinite, title-appear 0.5s ease-out forwards;
+        }
+
+        .result {
+            width: 80%;
+            max-width: 800px;
+            margin: 0;
+            padding: 40px;
+            border: 2px solid;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 28px;
+            letter-spacing: 2px;
+            line-height: 1.6;
+            position: relative;
+            overflow: hidden;
+            animation: result-appear 0.5s ease-out forwards;
+            background: rgba(0, 0, 0, 0.7);
+            animation: text-glow 2s infinite;
+        }
+
+        .productive {
+            background-color: rgba(0, 26, 0, 0.8);
+            border-color: #0f0;
+            color: #0f0;
+            box-shadow: 0 0 25px rgba(0, 255, 0, 0.3);
+        }
+
+        .not-productive {
+            background-color: rgba(26, 0, 0, 0.8);
+            border-color: #f00;
+            color: #f00;
+            box-shadow: 0 0 25px rgba(255, 0, 0, 0.3);
+        }
+
+        /* Analysis title animation */
+        @keyframes title-appear {
+            0% { transform: translateY(-40px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+
+        /* Result container animation */
+        @keyframes result-appear {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        select, input, button {
+            background-color: rgba(0, 20, 0, 0.8);
+            color: #0f0;
+            border: 1px solid #0f0;
+            padding: 3px;
+            width: 100%;
+            margin: 3px 0;
+            font-family: 'Share Tech Mono', monospace;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        button {
+            background: linear-gradient(45deg, rgba(0,20,0,0.8), rgba(0,40,0,0.8));
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button:hover {
+            background: linear-gradient(45deg, rgba(0,40,0,0.8), rgba(0,60,0,0.8));
+            text-shadow: 0 0 10px #0f0;
+            transform: scale(1.02);
+        }
+
+        button::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(0,255,0,0.1), transparent);
+            transform: rotate(45deg);
+            animation: shine 3s infinite;
+        }
+
+        @keyframes shine {
+            0% { transform: translateX(-200%) rotate(45deg); }
+            100% { transform: translateX(200%) rotate(45deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .loading {
+            color: #f00;
+            font-style: italic;
+            animation: text-glow 1s infinite;
+            text-align: center; /* ADDED: Center loading text */
+        }
+
+        .error {
+            color: #f00;
+            margin: 10px 0;
+            border-left: 3px solid #f00;
+            padding-left: 10px;
+            text-align: center; /* ADDED: Center error text */
+        }
+
+        #contextQuestions {
+            border: 1px solid #600;
+            padding: 0px;
+            margin: 5px 0 15px 0; /* Adjusted margins */
+            background-color: rgba(30,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            height: auto;
+            min-height: 220px; /* Adjusted height */
+            max-height: 280px;
+            transition: all 0.3s ease;
+            margin-top: 50px;
+            margin-left: -15px;
+            margin-right: 15px;
+        }
+
+        /* Matrix rain effect container */
+        canvas#matrix-rain {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background-color: #000;
+        }
+
+        /* Add a glowing effect to the text over the matrix */
+        #domainSelect, #contextQuestions, #analysisResult {
+            position: relative;
+            z-index: 1;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.2);
+        }
+
+        /* Scanline effect */
+        .scanline {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: rgba(255,0,0,0.1);
+            opacity: 0.75;
+            pointer-events: none;
+            animation: scanline 6s linear infinite;
+        }
+
+        @keyframes scanline {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100vh); }
+        }
+
+        /* Add these new styles */
+        @keyframes matrixChar {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .matrix-output {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.2;
+            letter-spacing: 2px;
+            color: #0f0;
+            min-height: 35px;    /* Reduced from 40px */
+            max-height: 70px;    /* Reduced from 80px */
+            padding: 5px;
+            border: 1px solid #0f0;
+            background-color: rgba(0, 20, 0, 0.2);
+            overflow: hidden;
+            position: relative;
+            margin-top: 5px;
+        }
+
+        .matrix-char {
+            display: inline-block;
+            animation: matrixChar 2s infinite;
+            margin: 0 2px;
+        }
+
+        .matrix-output::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(to right, #000, #0f0, #000);
+            animation: scanline 2s linear infinite;
+        }
+
+        .blink {
+            animation: blink 1s step-end infinite;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+
+        #terminal-cursor {
+            display: inline-block;
+            width: 8px;
+            height: 15px;
+            background: #0f0;
+            margin-left: 5px;
+            animation: blink 1s step-end infinite;
+        }
+
+        .matrix-output {
+            position: relative;
+            padding: 15px;
+            background: rgba(0,20,0,0.3);
+            border: 1px solid #0f0;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+
+        .matrix-char {
+            display: inline-block;
+            opacity: 0;
+            animation: fade-in 0.5s forwards;
+        }
+
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        #domainSelect, #contextQuestions, #analysisResult {
+            max-height: 220px;
+        }
+
+        input {
+            cursor: text;
+            caret-color: #0f0;
+        }
+
+        input:focus {
+            cursor: none !important;
+            caret-color: #0f0;
+        }
+
+        button, select {
+            cursor: pointer; /* Force hide system cursor on interactive elements */
+        }
+
+        /* Hide system cursor */
+        body:hover,
+        button:hover,
+        select:hover,
+        input:hover {
+            cursor: none !important;
+        }
+
+        /* Update responsive breakpoints to match redirect.html */
+        @media screen and (max-width: 900px) {
+            html, body {
+                width: 640px;  /* Reduced from 700px */
+                height: 410px; /* Adjusted height to ensure bottom border is visible */
+            }
+        }
+
+        @media screen and (max-width: 700px) {
+            html, body {
+                width: 640px;  /* Reduced from 500px */
+                height: 380px; /* Adjusted height to ensure bottom border is visible */
+            }
+        }
+
+        /* Add particle styles */
+        .particle {
+            pointer-events: none;
+            position: fixed;
+            background: #0f0;
+            border-radius: 50%;
+            opacity: 0;
+            z-index: 9999;
+            mix-blend-mode: screen;
+        }
+
+        @keyframes particle-fade {
+            0% { opacity: 0.8; transform: scale(1); }
+            100% { opacity: 0; transform: scale(0.2); }
+        }
+
+        /* Update question container styles */
+        #question {
+            font-size: 14px;
+            line-height: 1.3;
+            max-height: 100px; /* Increased from 80px */
+            min-height: 20px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            margin-left: 20px; /* Adjusted for centering */
+            margin-right: 15px; /* Adjusted for centering */
+            padding: 8px;
+            background: rgba(0, 20, 0, 0.3);
+            border: 1px solid #0f0;
+            word-wrap: break-word;
+        }
+
+        /* Add scrollbar styling for the question container */
+        #question::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        #question::-webkit-scrollbar-track {
+            background: rgba(0, 20, 0, 0.3);
+        }
+
+        #question::-webkit-scrollbar-thumb {
+            background: #0f0;
+            border-radius: 3px;
+        }
+
+        /* Update input and button sizes */
+        #answer {
+            height: 35px;
+            margin: 10px auto; /* Center the input */
+            padding: 8px;
+            width: 95%; /* Slightly less than 100% to center */
+        }
+
+        #nextQuestion {
+            height: 35px;
+            margin: 15px auto 5px auto; /* Center the button and add spacing */
+            width: 98%;
+        }
+
+        /* Update container heights and visibility */
+        #domainSelect {
+            height: auto;
+            padding: 15px;
+            margin-bottom: 10px;
+            margin-top: 70px;
+            margin-left: -15px;
+            transition: opacity 0.3s ease;
+        }
+
+        #contextQuestions.hidden,
+        #analysisResult.hidden {
+            display: none !important;
+            height: 0;
+            opacity: 0;
+        }
+
+        /* Make domain selector more prominent */
+        #domain {
+            height: 35px;
+            margin: 10px 0;
+            font-size: 16px;
+        }
+
+        #startContext {
+            height: 35px;
+            margin-top: 10px;
+            font-size: 16px;
+        }
+
+        /* Update scan-line styles */
+        .section-scan-line {
+            position: relative;
+            height: 2px;
+            width: 60%;
+            margin: 5px auto;
+            background: linear-gradient(90deg, transparent, currentColor, transparent);
+            animation: scan-line 2s linear infinite;
+        }
+
+        /* Color variants for scan-lines */
+        .scan-line-green {
+            color: #0f0;
+        }
+
+        .scan-line-red {
+            color: #ff0000;
+        }
+
+        /* Restore glow effects and animations */
+        @keyframes scan-line {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        /* Enhanced animations and effects */
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+        }
+
+        @keyframes fade-in {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
+        @keyframes slide-in {
+            0% { transform: translateY(20px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+
+        h3 {
+            position: relative;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+            animation: slide-in 0.5s ease-out, pulse 2s infinite alternate;
+        }
+
+        h3::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 5%;
+            width: 90%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #0f0, transparent);
+            animation: scan-line 2s linear infinite;
+        }
+
+        .result {
+            animation: text-glow 2s infinite, fade-in 1s ease-out;
+            position: relative;
+            padding-top: 30px;
+        }
+
+        .result::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 5%;
+            width: 90%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #0f0, transparent);
+            animation: scan-line 2s linear infinite reverse;
+        }
+
+        button {
+            position: relative;
+            overflow: hidden;
+            animation: pulse 2s infinite alternate;
+        }
+
+        button::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(0,255,0,0.1), transparent);
+            transform: rotate(45deg);
+            animation: shine 3s infinite;
+        }
+
+        input, select {
+            animation: fade-in 1s ease-out;
+        }
+
+        /* Background animation */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(0, 255, 0, 0.1), transparent);
+            animation: pulse 5s infinite alternate;
+            z-index: -1;
+        }
+
+        .analysis-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 400px;
+        }
+
+        #analysisSection {
+            position: relative;
+            padding: 20px;
+            text-align: center;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            height: auto;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            background: rgba(0, 0, 0, 0.8);
+            margin: 0;
+            border-radius: 5px;
+        }
+
+        #analysisBlockDuration {
+            margin-top: 30px;
+            padding: 20px;
+            border-top: 1px solid rgba(0, 255, 0, 0.3);
+        }
+
+        #analysisBlockDuration h4 {
+            color: #0f0;
+            font-size: 18px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #analysisSection h3 {
+            position: relative;
+            color: #0f0;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px #0f0;
+            font-size: 24px;
+            margin-bottom: 20px;
+            animation: title-appear 0.5s ease-out;
+            z-index: 3;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        #result {
+            position: relative;
+            padding: 20px;
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.95);
+            margin: 0 auto;
+            max-width: 80%;
+            font-family: 'Share Tech Mono', monospace;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+            border: 1px solid #0f0;
+            font-size: 16px;
+            line-height: 1.5;
+            animation: fade-in 0.5s ease-out;
+            z-index: 3;
+            margin-top: 10px;
+        }
+
+        #result .productive {
+            color: #0f0;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+        }
+
+        #result .not-productive {
+            color: #ff4444;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            text-shadow: 0 0 5px rgba(255, 68, 68, 0.5);
+        }
+
+        #result .explanation {
+            color: #88ff88;
+            margin: 15px 0;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+
+        #result .recommendations {
+            color: #66ff66;
+            margin-top: 15px;
+        }
+
+        #result .recommendations h4 {
+            color: #00ff00;
+            margin-bottom: 10px;
+            font-size: 1em;
+        }
+
+        #result .recommendations ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+
+        #result .recommendations li {
+            margin: 5px 0;
+            padding-left: 20px;
+            position: relative;
+            font-size: 0.9em;
+        }
+
+        #result .recommendations li:before {
+            content: ">";
+            position: absolute;
+            left: 0;
+            color: #00ff00;
+        }
+
+        #result .error {
+            color: #ff4444;
+            font-size: 1em;
+            padding: 10px;
+            border: 1px solid #ff4444;
+            border-radius: 5px;
+            background: rgba(255, 68, 68, 0.1);
+        }
+        
+        /* Analysis stats styles */
+        .analysis-stats {
+            background: rgba(0, 20, 0, 0.4);
+            border: 1px solid #0f0;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
+        }
+        
+        .analysis-stats h4 {
+            color: #0f0;
+            margin-top: 0;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-shadow: 0 0 5px #0f0;
+            text-align: center;
+            position: relative;
+        }
+        
+        .analysis-stats h4::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 25%;
+            width: 50%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #0f0, transparent);
+            box-shadow: 0 0 5px #0f0;
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 5px 0;
+            border-bottom: 1px dashed rgba(0, 255, 0, 0.3);
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            color: #88ff88;
+        }
+        
+        .stat-value {
+            font-weight: bold;
+            font-size: 1.1em;
+            color: #0f0;
+            text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+        }
+        
+        .stat-value.allowed {
+            color: #00ff00;
+        }
+        
+        .stat-value.blocked {
+            color: #ff4444;
+        }
+        
+        /* Latest activity styles */
+        .latest-activity {
+            background: rgba(0, 20, 0, 0.4);
+            border: 1px solid #0f0;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
+        }
+        
+        .latest-activity h4 {
+            color: #0f0;
+            margin-top: 0;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-shadow: 0 0 5px #0f0;
+            text-align: center;
+            position: relative;
+        }
+        
+        .latest-activity h4::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 25%;
+            width: 50%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #0f0, transparent);
+            box-shadow: 0 0 5px #0f0;
+        }
+        
+        .activity-item {
+            background: rgba(0, 30, 0, 0.5);
+            padding: 10px;
+            border-radius: 3px;
+            border-left: 3px solid #0f0;
+        }
+        
+        .activity-item.blocked {
+            border-left-color: #ff4444;
+            background: rgba(30, 0, 0, 0.5);
+        }
+        
+        .activity-item.allowed {
+            border-left-color: #00ff00;
+            background: rgba(0, 30, 0, 0.5);
+        }
+        
+        .activity-item.neutral {
+            border-left-color: #ffff00;
+            background: rgba(20, 20, 0, 0.5);
+        }
+        
+        .activity-url {
+            font-size: 0.9em;
+            word-break: break-all;
+            margin-bottom: 5px;
+            color: #bbffbb;
+        }
+        
+        .activity-status {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .activity-status.blocked {
+            color: #ff4444;
+            text-shadow: 0 0 5px rgba(255, 68, 68, 0.5);
+        }
+        
+        .activity-status.allowed {
+            color: #00ff00;
+            text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+        }
+        
+        .activity-reason {
+            font-size: 0.85em;
+            font-style: italic;
+            color: #88ff88;
+            border-top: 1px dashed rgba(0, 255, 0, 0.3);
+            padding-top: 5px;
+            margin-top: 5px;
+        }
+        
+        .activity-info {
+            font-size: 0.9em;
+            color: #dddddd;
+            text-align: center;
+            padding: 10px 0;
+        }
+        
+        /* Session info styles */
+        .session-info {
+            background: rgba(0, 20, 0, 0.4);
+            border: 1px solid #0f0;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
+        }
+        
+        .session-info h4 {
+            color: #0f0;
+            margin-top: 0;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-shadow: 0 0 5px #0f0;
+            text-align: center;
+            position: relative;
+        }
+        
+        .session-info h4::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 25%;
+            width: 50%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #0f0, transparent);
+            box-shadow: 0 0 5px #0f0;
+        }
+        
+        .session-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 5px 0;
+            border-bottom: 1px dashed rgba(0, 255, 0, 0.3);
+        }
+        
+        .session-label {
+            font-size: 0.9em;
+            color: #88ff88;
+        }
+        
+        .session-value {
+            font-weight: bold;
+            color: #0f0;
+            text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+        }
+        
+        .session-value.domain {
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .session-value.time {
+            font-family: 'Share Tech Mono', monospace;
+            letter-spacing: 2px;
+            font-size: 1.1em;
+            animation: pulse 2s infinite;
+        }
+        
+        /* Refresh button styles */
+        #refreshAnalysis {
+            margin: 10px auto 20px auto;
+            padding: 8px 15px;
+            width: auto;
+            display: block;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.9em;
+            background: rgba(0, 40, 0, 0.8);
+            border: 1px solid #0f0;
+            color: #0f0;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #refreshAnalysis:hover {
+            background: rgba(0, 60, 0, 0.8);
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+        }
+        
+        #refreshAnalysis::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(0, 255, 0, 0.1), transparent);
+            transform: rotate(45deg);
+            animation: shine 3s infinite;
+        }
+
+        #analysisSection::-webkit-scrollbar {
+            width: 8px;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        #analysisSection::-webkit-scrollbar-thumb {
+            background: rgba(0, 255, 0, 0.5);
+            border-radius: 4px;
+            border: 1px solid #0f0;
+            box-shadow: 0 0 5px rgba(0, 255, 0, 0.3);
+        }
+
+        #analysisSection::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 255, 0, 0.7);
+            box-shadow: 0 0 8px rgba(0, 255, 0, 0.5);
+        }
+
+        #analysisSection::-webkit-scrollbar-track {
+            background: rgba(0, 20, 0, 0.2);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="matrix-rain"></canvas>
+
+    <style>
+        #blockDurationSelect {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            border: 2px solid #0f0;
+            padding: 25px 50px;
+            background: rgba(0, 10, 0, 0.7);
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+            min-width: 400px;
+        }
+
+        #blockDurationSelect h3 {
+            color: #0f0;
+            font-size: 24px;
+            margin: 0 0 25px 0;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+
+        #blockDurationSelect input,
+        #blockDurationSelect select {
+            width: 140px;
+            height: 40px;
+            background: rgba(0, 20, 0, 0.8);
+            border: 2px solid #0f0;
+            color: #0f0;
+            font-size: 20px;
+            text-align: center;
+            margin: 0 10px;
+            outline: none;
+        }
+
+        #blockDurationSelect button {
+            width: 200px;
+            height: 45px;
+            margin-top: 25px;
+            background: rgba(0, 40, 0, 0.8);
+            border: 2px solid #0f0;
+            color: #0f0;
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        #blockDurationSelect button:hover {
+            background: rgba(0, 60, 0, 0.8);
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+        }
+    </style>
+    <div id="blockDurationSelect">
+        <h3>Initialize Block Protocol</h3>
+        <div class="section-scan-line scan-line-green"></div>
+        <div style="margin: 25px 0;">
+            <input type="number" id="blockDuration" min="1" max="480" value="30">
+            <select id="durationUnit">
+                <option value="minutes">Minutes</option>
+                <option value="hours">Hours</option>
+            </select>
+        </div>
+        <button id="startBlock" type="button">Set Duration</button>
+    </div>
+
+    <div id="domainSelect" class="hidden">
+        <h3>Select Domain</h3>
+        <div class="section-scan-line scan-line-green"></div>
+        <select id="domain">
+            <option value="">Select Domain...</option>
+            <option value="work">Work Protocol</option>
+            <option value="school">School Protocol</option>
+            <option value="personal">Personal Protocol</option>
+        </select>
+        <button id="startContext" type="button">Execute</button>
+    </div>
+
+    <div id="errorDisplay" class="error hidden"></div>
+
+    <div id="contextQuestions" class="hidden">
+        <h3>System Query</h3>
+        <div class="section-scan-line scan-line-red"></div>
+        <div id="question" style="margin-bottom: 10px;"></div>
+        <input type="text" id="answer" placeholder="Enter response...">
+        <button id="nextQuestion" type="button">Process</button>
+    </div>
+
+    <div id="analysisSection" class="hidden" style="display: none;">
+        <div class="analysis-container">
+            <h3>ANALYSIS OUTPUT</h3>
+            <div class="section-scan-line scan-line-green"></div>
+            <div id="analysisResult">
+                <div id="result" class="result"></div>
+            </div>
+            <div id="analysisBlockDuration" class="hidden" style="display: none;">
+                <h4>Set Block Duration</h4>
+                <div style="margin: 15px 0;">
+                    <input type="number" id="blockDurationAnalysis" min="1" max="480" value="30" style="width: 80px; margin-right: 10px;">
+                    <select id="durationUnitAnalysis" style="width: 100px;">
+                        <option value="minutes">Minutes</option>
+                        <option value="hours">Hours</option>
+                    </select>
+                </div>
+                <button id="startBlockAnalysis" class="block-button">START BLOCK</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="loadingIndicator" class="hidden loading">Initializing...</div>
+    <div id="errorDisplay" class="error hidden"></div>
+
+    <script>
+        // Add particle system
+        function createParticle(x, y) {
+            const particle = document.createElement('div');
+            particle.className = 'particle';
+            document.body.appendChild(particle);
+
+            // Randomize particle properties
+            const size = Math.random() * 8 + 4;
+            const destinationX = x + (Math.random() - 0.5) * 50;
+            const destinationY = y + (Math.random() - 0.5) * 50;
+            const rotation = Math.random() * 520;
+            const delay = Math.random() * 200;
+
+            // Set particle styles
+            particle.style.width = `${size}px`;
+            particle.style.height = `${size}px`;
+            particle.style.left = `${x}px`;
+            particle.style.top = `${y}px`;
+            particle.style.transform = `translate(-50%, -50%)`;
+            particle.style.animation = `particle-fade 1s ease-out ${delay}ms`;
+
+            // Remove particle after animation
+            setTimeout(() => particle.remove(), 1000 + delay);
+        }
+
+        // Add mousemove listener for particle creation
+        let throttleTimer;
+        document.addEventListener('mousemove', (e) => {
+            if (!throttleTimer) {
+                throttleTimer = setTimeout(() => {
+                    createParticle(e.clientX, e.clientY);
+                    throttleTimer = null;
+                }, 50); // Adjust this value to control particle density
+            }
+        });
+
+        // Prevent default form submission
+        document.addEventListener('submit', (e) => {
+            e.preventDefault();
+        });
+    </script>
+    <script src="popup.js"></script>
+</body>
+</html>

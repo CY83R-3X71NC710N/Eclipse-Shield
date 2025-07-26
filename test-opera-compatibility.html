@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Eclipse Shield - Opera Browser Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #000;
+            color: #0f0;
+        }
+        h1 { color: #0ff; }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #0f0;
+            border-radius: 5px;
+        }
+        .section h3 { color: #ff0; margin-top: 0; }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 3px;
+        }
+        .pass { background: #004400; color: #00ff00; }
+        .fail { background: #440000; color: #ff0000; }
+        .pending { background: #444400; color: #ffff00; }
+        button {
+            background: #0f0;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        button:hover { background: #0ff; }
+        a {
+            color: #0ff;
+            text-decoration: none;
+        }
+        a:hover { text-decoration: underline; }
+        .code {
+            background: #111;
+            padding: 10px;
+            border-radius: 3px;
+            font-family: monospace;
+            margin: 10px 0;
+            color: #ccc;
+        }
+        iframe {
+            width: 100%;
+            height: 300px;
+            border: 1px solid #0f0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🛡️ Eclipse Shield - Opera Browser Test</h1>
+    
+    <div class="section">
+        <h3>1. Server Status Check</h3>
+        <div id="serverTest" class="test-result pending">Testing server connection...</div>
+        <button onclick="testServer()">Retest Server</button>
+    </div>
+    
+    <div class="section">
+        <h3>2. New Tab Page Test</h3>
+        <p>Testing if the Eclipse Shield new tab page loads correctly:</p>
+        <iframe src="http://localhost:5000/extension/newtab.html" title="Eclipse Shield New Tab"></iframe>
+        <div class="test-result pass">✅ New tab page should load above with Matrix background and search box</div>
+    </div>
+    
+    <div class="section">
+        <h3>3. Matrix Animation Test</h3>
+        <div id="matrixTest" class="test-result pending">Testing matrix animation...</div>
+        <button onclick="testMatrix()">Test Matrix Animation</button>
+        <p>Matrix wrapper: <a href="http://localhost:5000/matrix-animation-wrapper.html" target="_blank">Open in new tab</a></p>
+    </div>
+    
+    <div class="section">
+        <h3>4. Extension Files Test</h3>
+        <div id="extensionTest" class="test-result pending">Testing extension files...</div>
+        <button onclick="testExtensionFiles()">Test Extension Files</button>
+    </div>
+    
+    <div class="section">
+        <h3>5. Analysis API Test</h3>
+        <div id="analysisTest" class="test-result pending">Testing analysis API...</div>
+        <button onclick="testAnalysis()">Test Analysis API</button>
+    </div>
+    
+    <div class="section">
+        <h3>6. Block Page Test</h3>
+        <div id="blockTest" class="test-result pending">Testing block page...</div>
+        <button onclick="testBlockPage()">Test Block Page</button>
+        <p>Block page: <a href="http://localhost:5000/extension/block.html?reason=test&url=https://example.com" target="_blank">Open in new tab</a></p>
+    </div>
+    
+    <div class="section">
+        <h3>7. Opera-Specific Background Script Test</h3>
+        <div class="test-result pass">✅ Using background.js (Opera-compatible) with added analysis functionality</div>
+        <div class="code">
+            manifest.json uses: "service_worker": "background.js"<br>
+            Enhanced with analysis logic from background-chrome.js
+        </div>
+    </div>
+    
+    <div class="section">
+        <h3>8. Manual Extension Test Steps</h3>
+        <ol>
+            <li><strong>Load Extension:</strong> Go to chrome://extensions/ (or opera://extensions/) and load the extension as unpacked from <code>/workspaces/Eclipse-Shield/extension/</code></li>
+            <li><strong>Check New Tab:</strong> Open a new tab - should show Eclipse Shield interface</li>
+            <li><strong>No Session Test:</strong> Try to navigate to any website - should show block page with "no-session" reason</li>
+            <li><strong>Start Session:</strong> Click extension icon, start a session with domain like "coding"</li>
+            <li><strong>Search Test:</strong> Use search box in new tab - should go to Startpage</li>
+            <li><strong>Click Test:</strong> Click on search results - should show "analyzing" page, then allow/block</li>
+            <li><strong>Direct URL Test:</strong> Type URLs in address bar - should trigger analysis</li>
+        </ol>
+    </div>
+    
+    <div class="section">
+        <h3>9. Debugging Information</h3>
+        <div class="code">
+            Extension Console: chrome://extensions/ → Eclipse Shield → service worker → Console<br>
+            Clear Storage: chrome.storage.local.clear()<br>
+            Check Storage: chrome.storage.local.get(null, console.log)<br>
+            Server Logs: docker-compose -f docker-compose.local.yml logs -f eclipse-shield
+        </div>
+    </div>
+    
+    <script>
+        async function testServer() {
+            const result = document.getElementById('serverTest');
+            try {
+                const response = await fetch('http://localhost:5000/health');
+                const data = await response.json();
+                result.className = 'test-result pass';
+                result.innerHTML = `✅ Server is healthy: ${JSON.stringify(data)}`;
+            } catch (error) {
+                result.className = 'test-result fail';
+                result.innerHTML = `❌ Server connection failed: ${error.message}`;
+            }
+        }
+        
+        async function testMatrix() {
+            const result = document.getElementById('matrixTest');
+            try {
+                const response = await fetch('http://localhost:5000/matrix-animation-wrapper.html');
+                if (response.ok) {
+                    result.className = 'test-result pass';
+                    result.innerHTML = '✅ Matrix animation wrapper loads successfully';
+                } else {
+                    result.className = 'test-result fail';
+                    result.innerHTML = `❌ Matrix animation failed: ${response.status}`;
+                }
+            } catch (error) {
+                result.className = 'test-result fail';
+                result.innerHTML = `❌ Matrix animation error: ${error.message}`;
+            }
+        }
+        
+        async function testExtensionFiles() {
+            const result = document.getElementById('extensionTest');
+            const files = [
+                'extension/newtab.html',
+                'extension/popup.html', 
+                'extension/background.js',
+                'extension/block.html'
+            ];
+            
+            try {
+                const tests = await Promise.all(files.map(async file => {
+                    const response = await fetch(`http://localhost:5000/${file}`);
+                    return { file, ok: response.ok, status: response.status };
+                }));
+                
+                const failures = tests.filter(t => !t.ok);
+                if (failures.length === 0) {
+                    result.className = 'test-result pass';
+                    result.innerHTML = '✅ All extension files load successfully';
+                } else {
+                    result.className = 'test-result fail';
+                    result.innerHTML = `❌ Failed files: ${failures.map(f => f.file).join(', ')}`;
+                }
+            } catch (error) {
+                result.className = 'test-result fail';
+                result.innerHTML = `❌ Extension files test error: ${error.message}`;
+            }
+        }
+        
+        async function testAnalysis() {
+            const result = document.getElementById('analysisTest');
+            try {
+                const response = await fetch('http://localhost:5000/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        url: 'https://github.com',
+                        domain: 'coding',
+                        context: [],
+                        session_id: 'test'
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    result.className = 'test-result pass';
+                    result.innerHTML = `✅ Analysis API works: ${JSON.stringify(data)}`;
+                } else {
+                    result.className = 'test-result fail';
+                    result.innerHTML = `❌ Analysis API failed: ${response.status}`;
+                }
+            } catch (error) {
+                result.className = 'test-result fail';
+                result.innerHTML = `❌ Analysis API error: ${error.message}`;
+            }
+        }
+        
+        async function testBlockPage() {
+            const result = document.getElementById('blockTest');
+            try {
+                const response = await fetch('http://localhost:5000/extension/block.html');
+                if (response.ok) {
+                    result.className = 'test-result pass';
+                    result.innerHTML = '✅ Block page loads successfully';
+                } else {
+                    result.className = 'test-result fail';
+                    result.innerHTML = `❌ Block page failed: ${response.status}`;
+                }
+            } catch (error) {
+                result.className = 'test-result fail';
+                result.innerHTML = `❌ Block page error: ${error.message}`;
+            }
+        }
+        
+        // Run initial tests
+        document.addEventListener('DOMContentLoaded', () => {
+            testServer();
+            testMatrix();
+            testExtensionFiles();
+            testAnalysis();
+            testBlockPage();
+        });
+    </script>
+</body>
+</html>

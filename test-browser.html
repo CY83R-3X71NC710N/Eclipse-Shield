@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eclipse Shield Connection Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #ddd;
+        }
+        .success {
+            background-color: #d4edda;
+            border-left-color: #28a745;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-left-color: #dc3545;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border-left-color: #17a2b8;
+            color: #0c5460;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #results {
+            margin-top: 20px;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛡️ Eclipse Shield Connection Test</h1>
+        <p>This page tests the connection to your local Eclipse Shield server from the browser.</p>
+        
+        <div class="test-result info">
+            <strong>Server URL:</strong> http://localhost:5000<br>
+            <strong>Test Purpose:</strong> Verify that the server is accessible and CORS is working
+        </div>
+
+        <div>
+            <button onclick="testHealth()">Test Health Endpoint</button>
+            <button onclick="testConnection()">Test Extension Connection</button>
+            <button onclick="testAnalyze()">Test Analyze Endpoint</button>
+            <button onclick="testAll()">Run All Tests</button>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const resultsDiv = document.getElementById('results');
+
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = message;
+            resultsDiv.appendChild(div);
+        }
+
+        function clearResults() {
+            resultsDiv.innerHTML = '';
+        }
+
+        async function testHealth() {
+            addResult('Testing health endpoint...', 'info');
+            try {
+                const response = await fetch('http://localhost:5000/health', {
+                    method: 'GET'
+                    // Don't include credentials for null origin
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`✅ Health endpoint working!<br><pre>${JSON.stringify(data, null, 2)}</pre>`, 'success');
+                } else {
+                    addResult(`❌ Health endpoint failed with status: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Health endpoint error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testConnection() {
+            addResult('Testing extension connection endpoint...', 'info');
+            try {
+                const response = await fetch('http://localhost:5000/test-connection', {
+                    method: 'GET'
+                    // Don't include credentials for null origin
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`✅ Extension connection working!<br><pre>${JSON.stringify(data, null, 2)}</pre>`, 'success');
+                } else {
+                    addResult(`❌ Extension connection failed with status: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Extension connection error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testAnalyze() {
+            addResult('Testing analyze endpoint...', 'info');
+            try {
+                const response = await fetch('http://localhost:5000/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    // Don't include credentials for null origin
+                    body: JSON.stringify({
+                        url: 'https://example.com',
+                        domain: 'example.com',
+                        context: [],
+                        session_id: 'test-session-' + Date.now()
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`✅ Analyze endpoint working!<br><pre>${JSON.stringify(data, null, 2)}</pre>`, 'success');
+                } else {
+                    addResult(`❌ Analyze endpoint failed with status: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Analyze endpoint error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testAll() {
+            clearResults();
+            addResult('🔍 Running all connection tests...', 'info');
+            
+            await testHealth();
+            await new Promise(resolve => setTimeout(resolve, 500)); // Small delay
+            
+            await testConnection();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            await testAnalyze();
+            
+            addResult('🎉 All tests completed!', 'info');
+        }
+
+        // Auto-run basic test on page load
+        window.addEventListener('load', () => {
+            setTimeout(testHealth, 1000);
+        });
+    </script>
+</body>
+</html>

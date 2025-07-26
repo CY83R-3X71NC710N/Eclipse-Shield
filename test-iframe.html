@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Matrix Animation in Iframe</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #222;
+            color: white;
+        }
+        iframe {
+            width: 800px;
+            height: 600px;
+            border: 2px solid #00ff00;
+            border-radius: 8px;
+        }
+        .info {
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #333;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <h1>Eclipse Shield - Matrix Animation Iframe Test</h1>
+        <p>This page tests if the matrix animation can be loaded in an iframe.</p>
+        <p>If you see a matrix animation below, the iframe is working correctly.</p>
+        <p>If you see a blank iframe or error, there may be CSP or X-Frame-Options issues.</p>
+    </div>
+    
+    <iframe 
+        src="http://localhost:5000/matrix-animation-wrapper.html" 
+        title="Matrix Animation"
+        sandbox="allow-scripts allow-same-origin">
+    </iframe>
+    
+    <script>
+        // Check iframe load status
+        const iframe = document.querySelector('iframe');
+        const statusDiv = document.createElement('div');
+        statusDiv.style.cssText = 'margin-top: 20px; padding: 10px; border-radius: 4px; font-weight: bold;';
+        document.body.appendChild(statusDiv);
+        
+        iframe.onload = function() {
+            console.log('Iframe loaded successfully');
+            statusDiv.textContent = '✅ Iframe loaded successfully!';
+            statusDiv.style.backgroundColor = '#004d00';
+            statusDiv.style.color = '#00ff00';
+            
+            // Try to access iframe content (will fail due to CORS, but that's expected)
+            setTimeout(() => {
+                try {
+                    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                    statusDiv.textContent += ' Content accessible.';
+                } catch (e) {
+                    statusDiv.textContent += ' Content blocked by CORS (expected for cross-origin iframe).';
+                }
+            }, 1000);
+        };
+        
+        iframe.onerror = function() {
+            console.error('Iframe failed to load');
+            statusDiv.textContent = '❌ Iframe failed to load';
+            statusDiv.style.backgroundColor = '#4d0000';
+            statusDiv.style.color = '#ff0000';
+        };
+        
+        // Set a timeout to detect if iframe never loads
+        setTimeout(() => {
+            if (!statusDiv.textContent) {
+                statusDiv.textContent = '⚠️ Iframe loading timeout - may be blocked by CSP or other security policy';
+                statusDiv.style.backgroundColor = '#4d4d00';
+                statusDiv.style.color = '#ffff00';
+            }
+        }, 5000);
+    </script>
+</body>
+</html>

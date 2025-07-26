@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Access Blocked</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; cursor: none !important; }
+
+        :root {
+            --matrix-green: #00ff00;
+            --matrix-dark: #002200;
+            --glow-color: rgba(0, 255, 0, 0.5);
+        }
+
+        body {
+            min-height: 100vh;
+            background: #000;
+            color: var(--matrix-green);
+            font-family: 'Share Tech Mono', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            perspective: 1000px;
+        }
+
+        #matrix-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        .block-container {
+            position: relative;
+            z-index: 1;
+            padding: 3rem;
+            background: rgba(0, 15, 0, 0.85); /* More opaque background */
+            border: 2px solid var(--matrix-green); /* Thicker border */
+            border-radius: 5px;
+            max-width: 600px;
+            transform-style: preserve-3d;
+            animation: float 6s ease-in-out infinite;
+            box-shadow: 
+                0 0 30px var(--glow-color),
+                0 0 60px rgba(0, 255, 0, 0.3),
+                inset 0 0 20px rgba(0, 255, 0, 0.1); /* Enhanced glow */
+            backdrop-filter: blur(3px);
+        }
+
+        .analyzing {
+            animation: analyzing-pulse 2s infinite;
+        }
+
+        @keyframes analyzing-pulse {
+            0% { border-color: var(--matrix-green); box-shadow: 0 0 30px var(--glow-color); }
+            50% { border-color: #88ff88; box-shadow: 0 0 50px var(--glow-color); }
+            100% { border-color: var(--matrix-green); box-shadow: 0 0 30px var(--glow-color); }
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 2rem;
+            height: 2rem;
+            border: 3px solid var(--matrix-green);
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+            margin-left: 1rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotateX(0deg); }
+            50% { transform: translateY(-20px) rotateX(5deg); }
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 2rem;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            position: relative;
+            text-shadow: 0 0 10px var(--matrix-green);
+            animation: glitch 5s infinite;
+        }
+
+        @keyframes glitch {
+            0% { transform: none; opacity: 1; }
+            7% { transform: skew(-0.5deg, -0.5deg); opacity: 0.75; }
+            10% { transform: none; opacity: 1; }
+            27% { transform: none; opacity: 1; }
+            30% { transform: skew(0.8deg, -0.1deg); opacity: 0.75; }
+            35% { transform: none; opacity: 1; }
+            52% { transform: none; opacity: 1; }
+            55% { transform: skew(-1deg, 0.2deg); opacity: 0.75; }
+            50% { transform: none; opacity: 1; }
+        }
+
+        .message {
+            font-size: 1.4rem;
+            line-height: 1.6;
+            margin: 1rem 0;
+            text-shadow: 0 0 5px var(--glow-color);
+            position: relative;
+        }
+
+        .timer {
+            font-size: 2rem;
+            margin: 2rem 0;
+            text-shadow: 0 0 15px var(--glow-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .timer span:first-child {
+            font-size: 1.5rem;
+            opacity: 0.9;
+        }
+
+        #countdown {
+            font-size: 3.5rem;
+            font-weight: bold;
+            letter-spacing: 3px;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { text-shadow: 0 0 15px var(--glow-color); }
+            50% { text-shadow: 0 0 30px var(--glow-color), 0 0 50px var(--glow-color); }
+        }
+
+        .scanline {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom,
+                transparent 49%,
+                rgba(0, 255, 0, 0.08) 50%, /* More visible scanlines */
+                transparent 51%
+            );
+            background-size: 100% 3px; /* Thinner, more frequent lines */
+            z-index: 2;
+            pointer-events: none;
+            animation: scan 8s linear infinite; /* Faster scanning */
+        }
+
+        @keyframes scan {
+            from { background-position: 0 0; }
+            to { background-position: 0 -400px; } /* Adjusted for new line size */
+        }
+
+        /* Simplified cursor styles */
+        .custom-cursor {
+            position: absolute;
+            pointer-events: none;
+            z-index: 10000;
+            display: none; /* Hide initially */
+        }
+
+        .cursor-ring {
+            position: fixed;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #0f0;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .cursor-dot {
+            position: fixed;
+            width: 4px;
+            height: 4px;
+            background-color: #0f0;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Matrix canvas styles */
+        #matrixCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 0.4; /* Increased from 0.15 for much better visibility */
+        }
+
+        /* Add new styles for URL display */
+        .url-container {
+            max-height: 150px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            word-break: break-all;
+            padding: 10px;
+            border: 1px solid var(--matrix-green);
+            border-radius: 3px;
+            margin: 1rem 0;
+            background: rgba(0, 20, 0, 0.3);
+        }
+
+        /* Custom scrollbar styles */
+        .url-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .url-container::-webkit-scrollbar-track {
+            background: rgba(0, 20, 0, 0.5);
+            border-radius: 4px;
+        }
+
+        .url-container::-webkit-scrollbar-thumb {
+            background: var(--matrix-green);
+            border-radius: 4px;
+            box-shadow: 0 0 5px var(--glow-color);
+        }
+
+        .url-container::-webkit-scrollbar-thumb:hover {
+            background: #00ff33;
+            box-shadow: 0 0 10px var(--glow-color);
+        }
+
+        #blockedUrl {
+            margin: 0;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1.1rem;
+            line-height: 1.4;
+            color: #ff0000;
+            text-shadow: 0 0 10px #ff0000;
+        }
+    </style>
+</head>
+<body>
+    <div class="custom-cursor">
+        <div class="cursor-ring"></div>
+        <div class="cursor-dot"></div>
+    </div>
+
+    <canvas id="matrixCanvas"></canvas>
+    <div class="scanline"></div>
+
+    <div class="block-container">
+        <div id="no-session" style="display: none;">
+            <h1>NO ACTIVE SESSION</h1>
+            <div class="message">START A PRODUCTIVITY SESSION TO CONTINUE</div>
+            <div class="message">Use the extension icon to initialize a new session.</div>
+        </div>
+        
+        <div id="analyzing" style="display: none;">
+            <h1>ANALYZING ACCESS</h1>
+            <div class="message">VERIFYING WEBSITE COMPATIBILITY...</div>
+            <div class="spinner"></div>
+        </div>
+        
+        <div id="blocked" style="display: none;">
+            <h1>ACCESS BLOCKED</h1>
+            <div class="message">RESTRICTED URL:</div>
+            <div class="url-container">
+                <div id="blockedUrl"></div>
+            </div>
+            <div id="explanation" class="message"></div>
+            <div class="timer">
+                <span>TIME REMAINING</span>
+                <span id="countdown">00:00:00</span>
+            </div>
+        </div>
+
+        <div id="error" style="display: none;">
+            <h1>ACCESS ERROR</h1>
+            <div class="message">An error occurred while analyzing this website.</div>
+            <div id="errorMessage" class="message"></div>
+        </div>
+    </div>
+
+    <script src="block.js"></script>
+</body>
+</html>

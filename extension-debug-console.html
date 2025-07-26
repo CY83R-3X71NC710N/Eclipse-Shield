@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Eclipse Shield - Extension Debug Console</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #000;
+            color: #0f0;
+        }
+        h1 { color: #0ff; }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #0f0;
+            border-radius: 5px;
+        }
+        .section h3 { color: #ff0; margin-top: 0; }
+        button {
+            background: #0f0;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        button:hover { background: #0ff; }
+        .log-box {
+            background: #111;
+            color: #ccc;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            margin: 10px 0;
+        }
+        .test-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .test-links a {
+            color: #0ff;
+            text-decoration: none;
+            padding: 5px 10px;
+            border: 1px solid #0ff;
+            border-radius: 3px;
+        }
+        .test-links a:hover {
+            background: #0ff;
+            color: #000;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .status.good { background: #004400; }
+        .status.warning { background: #444400; }
+        .status.error { background: #440000; }
+    </style>
+</head>
+<body>
+    <h1>🛡️ Eclipse Shield - Extension Debug Console</h1>
+    
+    <div class="section">
+        <h3>Debug Instructions</h3>
+        <ol>
+            <li><strong>Open Extension Console:</strong> Go to <code>opera://extensions/</code> → Eclipse Shield → "background page" or "service worker"</li>
+            <li><strong>Reload Extension:</strong> Click the reload button on the extension</li>
+            <li><strong>Check Logs:</strong> Look for debug messages starting with <code>[🔍 DEBUG]</code></li>
+            <li><strong>Test Navigation:</strong> Click the test links below while watching the console</li>
+            <li><strong>Monitor Events:</strong> You should see <code>🌐 onBeforeNavigate fired</code> for each navigation attempt</li>
+        </ol>
+    </div>
+    
+    <div class="section">
+        <h3>Expected Debug Output</h3>
+        <div class="log-box">
+[📦] Eclipse Shield background script loaded (Opera version) - 2025-06-26T...
+[🔍 DEBUG] Background script initialization complete
+[🔍 DEBUG] 🌐 onBeforeNavigate fired {url: "https://github.com", frameId: 0, ...}
+[🔍 DEBUG] ✅ Processing main frame navigation to: https://github.com
+[🔍 DEBUG] 🔍 Getting storage data for navigation analysis
+[🔍 DEBUG] 📊 Storage data retrieved: {hasSessionData: true, sessionState: "active", ...}
+[🛡️] Navigation attempt: https://github.com
+[🛡️] Session data: {state: "active", domain: "coding", ...}
+[🔍 DEBUG] ✅ Active session found - analyzing URL for productivity
+[🔍 DEBUG] 🔍 isExemptUrl check: {url: "https://github.com", isExempt: false, ...}
+[🔍 DEBUG] 🔍 Checking if URL already analyzed: https://github.com
+[🔍 DEBUG] 🔬 URL needs analysis, redirecting to analysis page
+[🛡️] Redirecting to analysis page for: https://github.com
+        </div>
+    </div>
+    
+    <div class="section">
+        <h3>Test Links (Click to Test Navigation)</h3>
+        <p><strong>Note:</strong> These will only work correctly if you have the extension installed and a session active.</p>
+        <div class="test-links">
+            <a href="https://github.com" target="_blank">GitHub (should analyze)</a>
+            <a href="https://stackoverflow.com" target="_blank">Stack Overflow (should analyze)</a>
+            <a href="https://reddit.com" target="_blank">Reddit (should analyze)</a>
+            <a href="https://youtube.com" target="_blank">YouTube (should analyze)</a>
+            <a href="https://www.startpage.com/sp/search?query=test" target="_blank">Startpage (should allow)</a>
+            <a href="http://localhost:5000/health" target="_blank">Local Server (should allow)</a>
+        </div>
+    </div>
+    
+    <div class="section">
+        <h3>Quick Extension Status Check</h3>
+        <button onclick="checkExtensionStatus()">Check Extension Status</button>
+        <div id="extensionStatus"></div>
+    </div>
+    
+    <div class="section">
+        <h3>Troubleshooting Steps</h3>
+        <div class="status warning">
+            <strong>If navigation events are NOT firing:</strong>
+            <ul>
+                <li>Extension service worker may have crashed - reload the extension</li>
+                <li>Check that webNavigation permission is in manifest.json</li>
+                <li>Verify host_permissions includes "&lt;all_urls&gt;"</li>
+                <li>Try opening links in new tabs vs same tab</li>
+            </ul>
+        </div>
+        
+        <div class="status warning">
+            <strong>If events fire but analysis doesn't happen:</strong>
+            <ul>
+                <li>Check session state in storage (should be "active")</li>
+                <li>Verify server at localhost:5000 is running</li>
+                <li>Check isExemptUrl function is working correctly</li>
+                <li>Look for errors in block.js when analysis page loads</li>
+            </ul>
+        </div>
+        
+        <div class="status error">
+            <strong>If you get redirected back to search:</strong>
+            <ul>
+                <li>This means the navigation is being cancelled/redirected</li>
+                <li>But the block page is not being shown properly</li>
+                <li>Check the chrome.tabs.update call in background script</li>
+                <li>Verify block.html loads correctly at chrome-extension://[id]/block.html</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="section">
+        <h3>Manual Console Commands</h3>
+        <p>Run these in the extension's background page console:</p>
+        <div class="log-box">
+// Check storage
+chrome.storage.local.get(null, console.log);
+
+// Clear storage
+chrome.storage.local.clear();
+
+// Set test session
+chrome.storage.local.set({
+    sessionData: {
+        state: 'active',
+        domain: 'coding',
+        startTime: Date.now(),
+        context: []
+    }
+});
+
+// Check active URLs being tracked
+console.log('Active URLs:', Array.from(activeUrls));
+
+// Test URL normalization
+console.log('Normalized:', normalizeUrl('https://github.com/'));
+
+// Test exempt URL check  
+console.log('Is exempt:', isExemptUrl('https://github.com'));
+        </div>
+    </div>
+    
+    <script>
+        function checkExtensionStatus() {
+            const status = document.getElementById('extensionStatus');
+            status.innerHTML = `
+                <div class="status good">
+                    <strong>To check extension status:</strong><br>
+                    1. Open opera://extensions/<br>
+                    2. Find Eclipse Shield extension<br>
+                    3. Click "background page" or "service worker"<br>
+                    4. Check console for debug messages<br>
+                    5. Look for "[📦] Eclipse Shield background script loaded"
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

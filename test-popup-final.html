@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Extension Popup - Final</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        iframe {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            width: 100%;
+            height: 600px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status.success { background-color: #d4edda; color: #155724; }
+        .status.error { background-color: #f8d7da; color: #721c24; }
+        .status.info { background-color: #d1ecf1; color: #0c5460; }
+        .test-results {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛡️ Eclipse Shield - Extension Popup Test (Final)</h1>
+        
+        <div class="test-section">
+            <h2>Testing Extension Popup in Iframe Context</h2>
+            <div class="status info">
+                Testing the extension popup loaded via Flask route with fallback storage support...
+            </div>
+            
+            <div class="test-results">
+                <h3>Expected Functionality:</h3>
+                <ul>
+                    <li>✅ HTML loads correctly</li>
+                    <li>✅ popup.js loads without 404 errors</li>
+                    <li>🔄 Fallback storage script provides chrome.storage API</li>
+                    <li>🔄 Buttons are clickable and responsive</li>
+                    <li>🔄 Settings can be saved/loaded</li>
+                    <li>🔄 UI elements display properly</li>
+                </ul>
+            </div>
+
+            <button onclick="testIframeInteraction()">Test Iframe Interaction</button>
+            <button onclick="checkConsoleForErrors()">Check Console</button>
+            <button onclick="testStorage()">Test Storage</button>
+            
+            <iframe id="popup-iframe" src="http://localhost:5000/ext-popup" 
+                    title="Extension Popup">
+            </iframe>
+        </div>
+        
+        <div class="test-section">
+            <h2>Console Output</h2>
+            <div id="console-output" class="test-results">
+                <em>Click "Check Console" to see any errors...</em>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Direct Access Links</h2>
+            <p>
+                <a href="http://localhost:5000/ext-popup" target="_blank">Open Popup in New Tab</a> |
+                <a href="http://localhost:5000/popup.js" target="_blank">View popup.js</a> |
+                <a href="http://localhost:5000/health" target="_blank">Health Check</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        function testIframeInteraction() {
+            const iframe = document.getElementById('popup-iframe');
+            const output = document.getElementById('console-output');
+            
+            try {
+                // Try to access iframe content
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                if (iframeDoc) {
+                    const buttons = iframeDoc.querySelectorAll('button');
+                    output.innerHTML = `
+                        <div class="status success">
+                            ✅ Iframe accessible!<br>
+                            Found ${buttons.length} buttons in the popup<br>
+                            ${buttons.length > 0 ? 'Buttons: ' + Array.from(buttons).map(b => b.textContent || b.id || 'unnamed').join(', ') : ''}
+                        </div>
+                    `;
+                    
+                    // Try to click the first button if it exists
+                    if (buttons.length > 0) {
+                        console.log('Attempting to click first button:', buttons[0]);
+                        buttons[0].click();
+                        output.innerHTML += `<div class="status info">🔄 Clicked first button: ${buttons[0].textContent || buttons[0].id}</div>`;
+                    }
+                } else {
+                    output.innerHTML = '<div class="status error">❌ Cannot access iframe content (CORS restriction)</div>';
+                }
+            } catch (error) {
+                output.innerHTML = `<div class="status error">❌ Error accessing iframe: ${error.message}</div>`;
+            }
+        }
+        
+        function checkConsoleForErrors() {
+            const output = document.getElementById('console-output');
+            // Note: Can't actually access console errors from another origin, but we can check our own
+            output.innerHTML = `
+                <div class="status info">
+                    🔍 Check your browser's developer console (F12) for any errors from the iframe.<br>
+                    Look for 404 errors, JavaScript errors, or CORS issues.
+                </div>
+            `;
+        }
+        
+        function testStorage() {
+            const output = document.getElementById('console-output');
+            
+            // Send a message to the iframe to test storage
+            const iframe = document.getElementById('popup-iframe');
+            try {
+                iframe.contentWindow.postMessage({ 
+                    type: 'test-storage',
+                    data: { test: 'value' }
+                }, 'http://localhost:5000');
+                
+                output.innerHTML = `
+                    <div class="status info">
+                        🔄 Sent storage test message to iframe.<br>
+                        Check if the popup can save/load settings.
+                    </div>
+                `;
+            } catch (error) {
+                output.innerHTML = `<div class="status error">❌ Error sending message: ${error.message}</div>`;
+            }
+        }
+        
+        // Listen for messages from the iframe
+        window.addEventListener('message', function(event) {
+            if (event.origin !== 'http://localhost:5000') return;
+            
+            const output = document.getElementById('console-output');
+            output.innerHTML += `
+                <div class="status success">
+                    📨 Received message from iframe: ${JSON.stringify(event.data)}
+                </div>
+            `;
+        });
+        
+        // Auto-load test
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                const output = document.getElementById('console-output');
+                output.innerHTML = `
+                    <div class="status info">
+                        🚀 Page loaded. Iframe should be loading the extension popup.<br>
+                        If you see the popup UI, the basic loading is working!
+                    </div>
+                `;
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

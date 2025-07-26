@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  eclipse-shield:
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=False
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-me}
+      - ECLIPSE_SHIELD_API_KEY=${ECLIPSE_SHIELD_API_KEY:-dev-api-key}
+      - REDIS_URL=redis://redis:6379/0
+      - RATE_LIMIT_STORAGE_URL=redis://redis:6379/1
+    depends_on:
+      - redis
+    volumes:
+      - ./logs:/app/logs
+      - ./api_key.txt:/app/api_key.txt:ro
+      - ./settings.json:/app/settings.json:ro
+    restart: unless-stopped
+    networks:
+      - eclipse-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-secure-redis-password}
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - eclipse-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 128M
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  redis_data:
+
+networks:
+  eclipse-network:
+    driver: bridge
+    internal: false  # Allow external access for localhost

@@ -1,0 +1,41 @@
+# Security-enhanced requirements for Eclipse Shield
+
+# Core Flask and web framework
+flask>=2.3.0
+flask-cors>=4.0.0
+Werkzeug>=2.3.0
+
+# Security extensions
+flask-limiter>=3.0.0          # Rate limiting
+flask-talisman>=1.1.0         # Security headers
+flask-wtf>=1.1.0              # CSRF protection
+
+# Authentication and encryption
+cryptography>=41.0.0          # Encryption utilities
+PyJWT>=2.8.0                  # JWT tokens
+bcrypt>=4.0.0                 # Password hashing
+
+# Input validation and sanitization
+bleach>=6.0.0                 # HTML sanitization
+validators>=0.20.0            # Input validators
+cerberus>=1.3.0               # Schema validation
+
+# Security monitoring and logging
+python-dotenv>=1.0.0          # Environment variables
+redis>=4.5.0                  # Session storage and rate limiting
+gunicorn>=21.0.0              # WSGI server
+
+# Original dependencies
+requests>=2.31.0
+google-generativeai>=0.3.0
+beautifulsoup4>=4.12.0
+psutil>=5.9.0
+
+# Development and testing
+pytest>=7.4.0
+pytest-flask>=1.2.0
+coverage>=7.2.0
+
+# Optional: Database for session storage
+# SQLAlchemy>=2.0.0
+# Flask-SQLAlchemy>=3.0.0

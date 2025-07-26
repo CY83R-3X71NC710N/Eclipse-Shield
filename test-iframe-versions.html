@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Iframe-Optimized Popup</title>
+    <style>
+        body {
+            font-family: 'Share Tech Mono', monospace;
+            background: #000;
+            color: #0f0;
+            padding: 20px;
+        }
+        iframe {
+            border: 2px solid #0f0;
+            width: 520px;
+            height: 320px;
+            margin: 20px 0;
+        }
+        .test-buttons {
+            margin: 20px 0;
+        }
+        button {
+            background: rgba(0, 20, 0, 0.8);
+            color: #0f0;
+            border: 1px solid #0f0;
+            padding: 10px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        .log {
+            border: 1px solid #0f0;
+            padding: 10px;
+            background: rgba(0, 20, 0, 0.3);
+            height: 200px;
+            overflow-y: auto;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Eclipse Shield - Iframe-Optimized Popup Test</h1>
+    
+    <h2>Original Version (may have storage issues):</h2>
+    <iframe id="original-frame" src="http://localhost:5000/ext-popup"></iframe>
+    
+    <h2>Iframe-Optimized Version (should work):</h2>
+    <iframe id="optimized-frame" src="http://localhost:5000/ext-popup-iframe"></iframe>
+    
+    <div class="test-buttons">
+        <button onclick="sendStorageTest()">Test Storage Message</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+    
+    <div class="log" id="log"></div>
+    
+    <script>
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}<br>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        function sendStorageTest() {
+            log('Sending test storage message to iframes...');
+            
+            [document.getElementById('original-frame'), document.getElementById('optimized-frame')].forEach((frame, index) => {
+                try {
+                    frame.contentWindow.postMessage({
+                        type: 'TEST_STORAGE'
+                    }, 'http://localhost:5000');
+                    log(`Test message sent to ${index === 0 ? 'original' : 'optimized'} frame`);
+                } catch (e) {
+                    log(`Error sending to ${index === 0 ? 'original' : 'optimized'} frame: ${e.message}`);
+                }
+            });
+        }
+        
+        // Listen for messages from iframes
+        window.addEventListener('message', function(event) {
+            if (event.origin !== 'http://localhost:5000') return;
+            
+            log(`Message from iframe: ${JSON.stringify(event.data)}`);
+            
+            // Handle storage requests
+            if (event.data.type === 'storage-get') {
+                const responsePort = event.ports[0];
+                log(`Storage GET request for: ${JSON.stringify(event.data.keys)}`);
+                
+                responsePort.postMessage({
+                    type: 'storage-response',
+                    result: {
+                        formState: {
+                            activeSection: 'blockDurationSelect',
+                            blockDuration: 30,
+                            durationUnit: 'minutes'
+                        }
+                    }
+                });
+                responsePort.close();
+                log('Sent storage response');
+            }
+            
+            if (event.data.type === 'storage-set') {
+                const responsePort = event.ports[0];
+                log(`Storage SET request: ${JSON.stringify(event.data.items)}`);
+                
+                responsePort.postMessage({
+                    type: 'storage-response'
+                });
+                responsePort.close();
+                log('Confirmed storage set');
+            }
+        });
+        
+        // Log when frames load
+        document.getElementById('original-frame').onload = () => log('Original frame loaded');
+        document.getElementById('optimized-frame').onload = () => log('Optimized frame loaded');
+        
+        log('Test page initialized');
+    </script>
+</body>
+</html>

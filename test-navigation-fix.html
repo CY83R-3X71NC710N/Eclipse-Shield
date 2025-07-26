@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Eclipse Shield - Fixed Navigation Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #000;
+            color: #0f0;
+        }
+        h1 { color: #0ff; }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #0f0;
+            border-radius: 5px;
+        }
+        .section h3 { color: #ff0; margin-top: 0; }
+        .issue-fixed {
+            background: #004400;
+            border-color: #00ff00;
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .issue-fixed h3 { color: #00ff00; }
+        .test-steps {
+            background: #000440;
+            border-color: #0088ff;
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .test-steps h3 { color: #0088ff; }
+        button {
+            background: #0f0;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        button:hover { background: #0ff; }
+        .code {
+            background: #111;
+            padding: 10px;
+            border-radius: 3px;
+            font-family: monospace;
+            margin: 10px 0;
+            color: #ccc;
+        }
+        .log-expected {
+            background: #001100;
+            padding: 10px;
+            border-radius: 3px;
+            font-family: monospace;
+            margin: 10px 0;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+        }
+    </style>
+</head>
+<body>
+    <h1>🛡️ Eclipse Shield - Fixed Navigation Test</h1>
+    
+    <div class="issue-fixed">
+        <h3>✅ Issue Fixed: Opera New Tab Interference</h3>
+        <p><strong>Problem:</strong> The Opera-specific new tab handler was immediately redirecting block pages back to newtab.html, preventing analysis from completing.</p>
+        <p><strong>Solution:</strong> Modified the new tab handler to:</p>
+        <ul>
+            <li>🔍 Detect if a tab is already showing a block page</li>
+            <li>⏰ Add a 500ms delay to let navigation handling complete</li>
+            <li>🛡️ Skip redirection for tabs that are being analyzed</li>
+            <li>📝 Added comprehensive debug logging</li>
+        </ul>
+    </div>
+    
+    <div class="test-steps">
+        <h3>🧪 Testing Steps</h3>
+        <ol>
+            <li><strong>Reload Extension:</strong> Go to <code>opera://extensions/</code> and reload Eclipse Shield</li>
+            <li><strong>Open Extension Console:</strong> Click "background page" to see debug logs</li>
+            <li><strong>Start a Session:</strong> Use the extension popup to start a productivity session (domain: "work" or "coding")</li>
+            <li><strong>Search:</strong> Open new tab, search for "update" in the search box</li>
+            <li><strong>Click Result:</strong> Click on the first search result from Startpage</li>
+            <li><strong>Watch Console:</strong> Look for the new debug messages below</li>
+        </ol>
+    </div>
+    
+    <div class="section">
+        <h3>Expected Console Output (After Fix)</h3>
+        <div class="log-expected">
+[🔍 DEBUG] 🌐 onBeforeNavigate fired {url: "https://example.com", ...}
+[🔍 DEBUG] ✅ Processing main frame navigation to: https://example.com
+[🔍 DEBUG] ✅ Active session found - analyzing URL for productivity
+[🔍 DEBUG] 🔬 URL needs analysis, redirecting to analysis page
+[🛡️] Redirecting to analysis page for: https://example.com
+[🔍 DEBUG] 📦 Detected browser new tab, checking if we should redirect
+[🔍 DEBUG] 🔍 Tab status after delay: {isNowBlockPage: true, ...}
+[🔍 DEBUG] ⏭️ Skipping new tab redirect - tab is being handled elsewhere
+        </div>
+        <p><strong>Key Changes:</strong></p>
+        <ul>
+            <li>✅ Should see "📦 Detected browser new tab" message</li>
+            <li>✅ Should see "🔍 Tab status after delay" check</li>
+            <li>✅ Should see "⏭️ Skipping new tab redirect" instead of redirecting</li>
+            <li>✅ Block page should stay open and perform analysis</li>
+        </ul>
+    </div>
+    
+    <div class="section">
+        <h3>What Should Happen Now</h3>
+        <ol>
+            <li>🔍 <strong>Navigation Intercepted:</strong> Click on search result</li>
+            <li>📄 <strong>Analysis Page Loads:</strong> Block page with "Analyzing..." message appears</li>
+            <li>⏳ <strong>Analysis Runs:</strong> Page calls the Flask /analyze endpoint</li>
+            <li>✅ <strong>Decision Made:</strong> Either redirects to site (allowed) or shows block page (blocked)</li>
+            <li>🚫 <strong>No More Redirect Loop:</strong> Page stays on analysis/block instead of going back to search</li>
+        </ol>
+    </div>
+    
+    <div class="section">
+        <h3>If It Still Doesn't Work</h3>
+        <p>Check the console for these specific issues:</p>
+        
+        <div class="code">
+<strong>Issue 1: No navigation events</strong>
+- Look for "🌐 onBeforeNavigate fired" when clicking
+- If missing: Extension permissions or registration problem
+
+<strong>Issue 2: Analysis page loads but immediately redirects</strong>  
+- Look for "Successfully redirected to custom new tab page"
+- If present: New tab handler is still interfering
+
+<strong>Issue 3: Analysis fails</strong>
+- Look for fetch errors or "Analysis error"
+- If present: Server connection or API issues
+
+<strong>Issue 4: Block page doesn't load analysis section</strong>
+- Check block.js console for errors
+- Verify reason=analyzing parameter is passed correctly
+        </div>
+    </div>
+    
+    <div class="section">
+        <h3>Debug Commands</h3>
+        <p>Run these in the extension background console:</p>
+        <div class="code">
+// Check session state
+chrome.storage.local.get(['sessionData'], console.log);
+
+// Check if URLs are being tracked  
+console.log('Active URLs:', Array.from(activeUrls));
+
+// Test server connection manually
+fetch('http://localhost:5000/analyze', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({url: 'https://github.com', domain: 'coding', context: []})
+}).then(r => r.json()).then(console.log);
+        </div>
+    </div>
+    
+    <div class="section">
+        <h3>Server Status</h3>
+        <button onclick="testServer()">Test Server Connection</button>
+        <div id="serverStatus"></div>
+    </div>
+    
+    <script>
+        async function testServer() {
+            const status = document.getElementById('serverStatus');
+            try {
+                const response = await fetch('http://localhost:5000/health');
+                const data = await response.json();
+                status.innerHTML = `<div style="color: #0f0; margin-top: 10px;">✅ Server is healthy: ${JSON.stringify(data)}</div>`;
+            } catch (error) {
+                status.innerHTML = `<div style="color: #f00; margin-top: 10px;">❌ Server connection failed: ${error.message}</div>`;
+            }
+        }
+        
+        // Test server on page load
+        testServer();
+    </script>
+</body>
+</html>

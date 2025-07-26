@@ -1,0 +1,1047 @@
+"""
+Secure Flask application factory for Eclipse Shield.
+Implements comprehensive security measures including authentication,
+rate limiting, input validation, and security headers.
+"""
+
+import os
+import time
+import secrets
+from flask import Flask, request, jsonify, make_response, send_from_directory, render_template, session, redirect, g
+from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_talisman import Talisman
+from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.exceptions import RequestEntityTooLarge, BadRequest
+import logging
+from functools import wraps
+import threading
+import json
+
+from script import ProductivityAnalyzer
+from security import (
+    SecurityConfig, InputValidator, SecurityMiddleware,
+    generate_csrf_token, validate_csrf_token, require_api_key,
+    secure_filename
+)
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+def create_app(config_name='production'):
+    """Create and configure the Flask application with security measures."""
+    
+    app = Flask(__name__,
+                static_folder='extension',
+                template_folder='extension')
+    
+    # Apply security configuration
+    app.config.from_object(SecurityConfig)
+    
+    # Trust proxy headers if behind reverse proxy
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+    
+    # Initialize security middleware
+    security_middleware = SecurityMiddleware(app)
+    
+    # Initialize rate limiter
+    limiter = Limiter(
+        key_func=get_remote_address,
+        storage_uri=SecurityConfig.RATE_LIMIT_STORAGE_URL,
+        default_limits=[SecurityConfig.RATE_LIMIT_DEFAULT]
+    )
+    limiter.init_app(app)
+    
+    # Initialize Talisman for security headers (configured for localhost)
+    # Disable Talisman CSP and Frame Options since we handle them manually for Chrome extension compatibility
+    talisman = Talisman(
+        app,
+        force_https=False,  # Keep False for localhost development
+        strict_transport_security=False,  # Disable HSTS for localhost
+        content_security_policy=False,  # Disable Talisman CSP - we handle it manually
+        frame_options=False,  # Disable Talisman frame options - we handle manually
+        content_security_policy_nonce_in=['script-src', 'style-src']
+    )
+    
+    # Configure CORS with security (Chrome extension compatible)
+    CORS(app, resources={
+        r"/*": {
+            "origins": SecurityConfig.CORS_ORIGINS,
+            "methods": ["GET", "POST", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization", "X-API-Key", "X-CSRF-Token"],
+            "supports_credentials": True,
+            "expose_headers": ["X-CSRF-Token"],
+            "max_age": 3600
+        }
+    })
+    
+    # Additional CORS handling for Chrome extensions
+    @app.after_request
+    def handle_cors(response):
+        origin = request.headers.get('Origin')
+        
+        # Handle Chrome extensions and localhost
+        if origin and (origin.startswith('chrome-extension://') or 
+                      origin.startswith('moz-extension://') or
+                      origin in ['http://localhost:5000', 'http://127.0.0.1:5000']):
+            response.headers['Access-Control-Allow-Origin'] = origin
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS, PUT, DELETE'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-API-Key, X-CSRF-Token, Origin, Accept'
+            response.headers['Access-Control-Expose-Headers'] = 'X-CSRF-Token, Content-Type'
+        
+        # Handle null origin (file:// protocol) - can't use credentials with wildcard
+        elif origin == 'null':
+            response.headers['Access-Control-Allow-Origin'] = 'null'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS, PUT, DELETE'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-API-Key, X-CSRF-Token'
+            response.headers['Access-Control-Expose-Headers'] = 'X-CSRF-Token'
+            # Don't set credentials=true for null origin
+        
+        # Handle no origin for localhost development
+        elif not origin:
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS, PUT, DELETE'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-API-Key, X-CSRF-Token'
+            response.headers['Access-Control-Expose-Headers'] = 'X-CSRF-Token'
+            # Don't set credentials=true for wildcard
+        
+        return response
+    
+    @app.before_request
+    def handle_preflight():
+        """Handle CORS preflight requests."""
+        if request.method == 'OPTIONS':
+            response = make_response()
+            origin = request.headers.get('Origin')
+            
+            # Allow Chrome extensions and localhost
+            if origin and (origin.startswith('chrome-extension://') or 
+                          origin.startswith('moz-extension://') or
+                          origin in ['http://localhost:5000', 'http://127.0.0.1:5000']):
+                response.headers['Access-Control-Allow-Origin'] = origin
+                response.headers['Access-Control-Allow-Credentials'] = 'true'
+                response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS, PUT, DELETE'
+                response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-API-Key, X-CSRF-Token, Origin, Accept'
+                response.headers['Access-Control-Max-Age'] = '3600'
+                return response
+            
+            # Handle null origin (file:// protocol) - can't use credentials with wildcard
+            elif origin == 'null':
+                response.headers['Access-Control-Allow-Origin'] = 'null'
+                response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS, PUT, DELETE'
+                response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-API-Key, X-CSRF-Token'
+                response.headers['Access-Control-Max-Age'] = '3600'
+                # Don't set credentials=true for null origin
+                return response
+            
+            # Handle no origin for local development
+            elif not origin:
+                response.headers['Access-Control-Allow-Origin'] = '*'
+                response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS, PUT, DELETE'
+                response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-API-Key, X-CSRF-Token'
+                response.headers['Access-Control-Max-Age'] = '3600'
+                return response
+    
+    # Initialize analyzer
+    analyzer = ProductivityAnalyzer()
+    
+    # Cache structure with thread safety
+    cache_lock = threading.Lock()
+    url_cache = {
+        'data': {},
+        'timestamps': {},
+        'session_ids': {}
+    }
+    CACHE_DURATION = 300  # 5 minutes for security
+    
+    def clear_expired_cache():
+        """Clear expired cache entries with thread safety."""
+        current_time = time.time()
+        expired = []
+        
+        with cache_lock:
+            for url in list(url_cache['timestamps']):
+                if current_time - url_cache['timestamps'][url] > CACHE_DURATION:
+                    expired.append(url)
+            
+            for url in expired:
+                url_cache['data'].pop(url, None)
+                url_cache['timestamps'].pop(url, None)
+                url_cache['session_ids'].pop(url, None)
+            
+            if expired:
+                logger.debug(f"Cleared {len(expired)} expired cache entries")
+    
+    @app.before_request
+    def security_checks():
+        """Perform security checks before each request."""
+        client_ip = get_remote_address()
+        
+        # Rate limiting check
+        if security_middleware.is_rate_limited(client_ip):
+            logger.warning(f"Rate limit exceeded for IP: {client_ip}")
+            return jsonify({'error': 'Rate limit exceeded'}), 429
+        
+        # Content length check
+        if request.content_length and request.content_length > SecurityConfig.MAX_CONTENT_LENGTH:
+            raise RequestEntityTooLarge()
+        
+        # Validate request headers
+        user_agent = request.headers.get('User-Agent', '')
+        if len(user_agent) > 1000:  # Prevent header injection
+            raise BadRequest('Invalid User-Agent header')
+        
+        # Generate CSRF token for sessions
+        if 'csrf_token' not in session:
+            session['csrf_token'] = generate_csrf_token()
+    
+    @app.after_request
+    def security_headers(response):
+        """Apply security headers to all responses."""
+        # Apply security headers but modify for Chrome extensions
+        origin = request.headers.get('Origin', '')
+        referer = request.headers.get('Referer', '')
+        user_agent = request.headers.get('User-Agent', '')
+        
+        # Check if request is from Chrome extension or any Chrome browser accessing /ext-popup
+        is_extension = (origin.startswith('chrome-extension://') or 
+                       origin.startswith('moz-extension://') or
+                       referer.startswith('chrome-extension://') or
+                       referer.startswith('moz-extension://') or
+                       '/ext-popup' in request.path or  # Any request to ext-popup endpoint
+                       '/matrix-animation' in request.path or  # Matrix animation iframe
+                       request.path.startswith('/extension/'))  # Any request to extension files
+        
+        for header, value in SecurityConfig.SECURITY_HEADERS.items():
+            if header == 'Content-Security-Policy':
+                if is_extension:
+                    # More permissive CSP for extensions - completely remove frame-ancestors
+                    response.headers[header] = (
+                        "default-src 'self' http://localhost:* http://127.0.0.1:* chrome-extension: moz-extension:; "
+                        "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* http://127.0.0.1:* chrome-extension: moz-extension:; "
+                        "style-src 'self' 'unsafe-inline' http://localhost:* http://127.0.0.1:* chrome-extension: moz-extension:; "
+                        "img-src 'self' data: blob: http://localhost:* http://127.0.0.1:* chrome-extension: moz-extension:; "
+                        "connect-src 'self' http://localhost:* http://127.0.0.1:* chrome-extension: moz-extension:; "
+                        "font-src 'self' data: http://localhost:* http://127.0.0.1:* chrome-extension: moz-extension:; "
+                        "base-uri 'self'; "
+                        "form-action 'self';"
+                    )
+                else:
+                    response.headers[header] = value
+            elif header == 'X-Frame-Options':
+                if is_extension:
+                    # Don't set X-Frame-Options for extensions
+                    pass
+                else:
+                    response.headers[header] = value
+            else:
+                response.headers[header] = value
+        
+        # Add CSRF token to response
+        if 'csrf_token' in session:
+            response.headers['X-CSRF-Token'] = session['csrf_token']
+        
+        return response
+    
+    @app.errorhandler(413)
+    def request_too_large(error):
+        """Handle request entity too large errors."""
+        logger.warning(f"Request too large from {get_remote_address()}")
+        return jsonify({'error': 'Request too large'}), 413
+    
+    @app.errorhandler(400)
+    def bad_request(error):
+        """Handle bad request errors."""
+        logger.warning(f"Bad request from {get_remote_address()}: {error}")
+        return jsonify({'error': 'Bad request'}), 400
+    
+    @app.errorhandler(429)
+    def rate_limit_exceeded(error):
+        """Handle rate limit exceeded errors."""
+        return jsonify({'error': 'Rate limit exceeded. Please try again later.'}), 429
+    
+    def validate_request_data(required_fields=None):
+        """Decorator to validate request data."""
+        def decorator(f):
+            @wraps(f)
+            def decorated_function(*args, **kwargs):
+                try:
+                    data = request.get_json(force=True)
+                except Exception:
+                    return jsonify({'error': 'Invalid JSON payload'}), 400
+                
+                if required_fields:
+                    is_valid, error_msg = InputValidator.validate_json_payload(data, required_fields)
+                    if not is_valid:
+                        return jsonify({'error': error_msg}), 400
+                
+                return f(data, *args, **kwargs)
+            return decorated_function
+        return decorator
+    
+    # Routes with security
+    @app.route('/')
+    def root():
+        """Serve the main page."""
+        try:
+            return send_from_directory('extension', 'popup.html')
+        except Exception as e:
+            logger.error(f"Error serving root page: {e}")
+            return jsonify({'error': 'Internal server error'}), 500
+    
+    @app.route('/health')
+    def health_check():
+        """Health check endpoint."""
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': time.time(),
+            'version': '2.0.0'
+        })
+    
+    @app.route('/test-simple')
+    def test_simple():
+        """Simple test route."""
+        return "SIMPLE TEST WORKING"
+    
+    @app.route('/extension/<path:filename>')
+    @limiter.limit("50/minute")
+    def extension_files(filename):
+        """Serve extension files with security checks."""
+        # Secure filename
+        filename = secure_filename(filename)
+        
+        # Validate file extension
+        if '.' in filename:
+            ext = filename.rsplit('.', 1)[1].lower()
+            if ext not in ['js', 'html', 'css', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'woff', 'woff2', 'json', 'glsl', 'wgsl', 'ttf']:
+                return jsonify({'error': 'File type not allowed'}), 403
+        
+        try:
+            response = make_response(send_from_directory('extension', filename))
+            
+            # Set appropriate content type
+            if filename.endswith('.js'):
+                response.headers['Content-Type'] = 'application/javascript'
+            elif filename.endswith('.html'):
+                response.headers['Content-Type'] = 'text/html'
+            elif filename.endswith('.css'):
+                response.headers['Content-Type'] = 'text/css'
+            elif filename.endswith('.glsl'):
+                response.headers['Content-Type'] = 'text/plain'
+            elif filename.endswith('.wgsl'):
+                response.headers['Content-Type'] = 'text/plain'
+            elif filename.endswith('.ttf'):
+                response.headers['Content-Type'] = 'font/ttf'
+            
+            # Cache control for static assets
+            if filename.endswith(('.png', '.jpg', '.jpeg', '.gif', '.svg', '.woff', '.woff2', '.ttf')):
+                response.headers['Cache-Control'] = 'public, max-age=3600'
+            else:
+                response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            
+            return response
+        except Exception as e:
+            logger.error(f"Error serving extension file {filename}: {e}")
+            return jsonify({'error': 'File not found'}), 404
+    
+    @app.route('/assets/<path:filename>')
+    @limiter.limit("50/minute")
+    def assets_files(filename):
+        """Serve asset files from extension/assets directory."""
+        # Secure filename
+        filename = secure_filename(filename)
+        
+        # Validate file extension
+        if '.' in filename:
+            ext = filename.rsplit('.', 1)[1].lower()
+            if ext not in ['png', 'jpg', 'jpeg', 'gif', 'svg', 'woff', 'woff2', 'ttf', 'ico']:
+                return jsonify({'error': 'File type not allowed'}), 403
+        
+        try:
+            response = make_response(send_from_directory('extension/assets', filename))
+            
+            # Set appropriate content type
+            if filename.endswith('.png'):
+                response.headers['Content-Type'] = 'image/png'
+            elif filename.endswith('.jpg') or filename.endswith('.jpeg'):
+                response.headers['Content-Type'] = 'image/jpeg'
+            elif filename.endswith('.gif'):
+                response.headers['Content-Type'] = 'image/gif'
+            elif filename.endswith('.svg'):
+                response.headers['Content-Type'] = 'image/svg+xml'
+            elif filename.endswith('.ico'):
+                response.headers['Content-Type'] = 'image/x-icon'
+            
+            # Cache control for assets
+            response.headers['Cache-Control'] = 'public, max-age=3600'
+            
+            return response
+        except Exception as e:
+            logger.error(f"Error serving asset file {filename}: {e}")
+            return jsonify({'error': 'File not found'}), 404
+
+    @app.route('/analyze', methods=['POST'])
+    @limiter.limit(SecurityConfig.RATE_LIMIT_STRICT)
+    @validate_request_data(['url', 'domain'])
+    def analyze(data):
+        """Analyze URL with comprehensive security validation."""
+        try:
+            url = data.get('url', '').strip()
+            domain = data.get('domain', '').strip()
+            context = data.get('context', [])
+            session_id = data.get('session_id', '')
+            
+            # Validate inputs
+            if not InputValidator.validate_url(url):
+                security_middleware.record_failed_attempt(get_remote_address())
+                return jsonify({'error': 'Invalid URL format'}), 400
+            
+            if not InputValidator.validate_domain(domain):
+                security_middleware.record_failed_attempt(get_remote_address())
+                return jsonify({'error': 'Invalid domain format'}), 400
+            
+            # Sanitize session ID
+            session_id = InputValidator.sanitize_string(session_id, 64)
+            
+            # Clear expired cache
+            clear_expired_cache()
+            
+            # Check cache
+            cache_key = f"{url}-{domain}"
+            current_time = time.time()
+            
+            with cache_lock:
+                if (cache_key in url_cache['data'] and
+                    url_cache['session_ids'].get(cache_key) == session_id and
+                    current_time - url_cache['timestamps'].get(cache_key, 0) <= CACHE_DURATION):
+                    logger.debug(f"Cache hit for {url}")
+                    return jsonify(url_cache['data'][cache_key])
+            
+            # Process context safely
+            context_dict = {}
+            if isinstance(context, list):
+                for qa in context[:10]:  # Limit context size
+                    if isinstance(qa, dict):
+                        question = InputValidator.sanitize_string(qa.get('question', ''), 500)
+                        answer = InputValidator.sanitize_string(qa.get('answer', ''), 1000)
+                        if question and answer:
+                            context_dict[question] = answer
+            
+            # Set analyzer context
+            analyzer.context_data = context_dict
+            
+            # Perform analysis
+            try:
+                analysis_result = analyzer.analyze_website(url, domain)
+                
+                result = {
+                    'isProductive': bool(analysis_result.get('isProductive', False)),
+                    'explanation': InputValidator.sanitize_string(
+                        analysis_result.get('explanation', ''), 500
+                    ),
+                    'confidence': max(0.0, min(1.0, float(analysis_result.get('confidence', 0.5)))),
+                    'timestamp': current_time
+                }
+                
+                # Cache result
+                with cache_lock:
+                    url_cache['data'][cache_key] = result
+                    url_cache['timestamps'][cache_key] = current_time
+                    url_cache['session_ids'][cache_key] = session_id
+                
+                return jsonify(result)
+                
+            except Exception as e:
+                logger.error(f"Analysis error for {url}: {e}")
+                return jsonify({
+                    'error': 'Analysis failed',
+                    'isProductive': False,
+                    'explanation': 'Unable to analyze URL due to technical error'
+                }), 500
+                
+        except Exception as e:
+            logger.error(f"Request processing error: {e}")
+            return jsonify({'error': 'Request processing failed'}), 500
+    
+    @app.route('/get_question', methods=['POST'])
+    @limiter.limit(SecurityConfig.RATE_LIMIT_STRICT)
+    @validate_request_data(['domain'])
+    def get_question(data):
+        """Get contextual question with validation."""
+        try:
+            domain = InputValidator.sanitize_string(data.get('domain', ''), 100)
+            context = data.get('context', {})
+            
+            if not InputValidator.validate_domain(domain):
+                return jsonify({'error': 'Invalid domain'}), 400
+            
+            # Sanitize context
+            if isinstance(context, dict):
+                sanitized_context = {}
+                for k, v in list(context.items())[:5]:  # Limit context size
+                    if isinstance(k, str) and isinstance(v, str):
+                        key = InputValidator.sanitize_string(k, 200)
+                        value = InputValidator.sanitize_string(v, 500)
+                        if key and value:
+                            sanitized_context[key] = value
+                context = sanitized_context
+            
+            response = analyzer.get_next_question(domain, context)
+            
+            # Sanitize response
+            if isinstance(response, dict):
+                if 'question' in response:
+                    response['question'] = InputValidator.sanitize_string(
+                        response['question'], 500
+                    )
+            
+            return jsonify(response)
+            
+        except Exception as e:
+            logger.error(f"Question generation error: {e}")
+            return jsonify({'error': 'Question generation failed'}), 500
+    
+    @app.route('/block.html')
+    @app.route('/block')
+    def block_page():
+        """Serve block page with input validation."""
+        try:
+            reason = InputValidator.sanitize_string(
+                request.args.get('reason', 'This site has been blocked'), 200
+            )
+            url = request.args.get('url', '')
+            
+            # Validate URL if provided
+            if url and not InputValidator.validate_url(url):
+                url = ''
+            
+            return render_template('block.html', reason=reason, url=url)
+            
+        except Exception as e:
+            logger.error(f"Block page error: {e}")
+            return jsonify({'error': 'Block page unavailable'}), 500
+    
+    @app.route('/test-connection', methods=['GET', 'OPTIONS'])
+    def test_connection():
+        """Test endpoint for Chrome extension connectivity."""
+        if request.method == 'OPTIONS':
+            # Handle preflight request
+            response = make_response()
+            origin = request.headers.get('Origin')
+            if origin and (origin.startswith('chrome-extension://') or 
+                          origin.startswith('moz-extension://') or
+                          origin in ['http://localhost:5000', 'http://127.0.0.1:5000']):
+                response.headers['Access-Control-Allow-Origin'] = origin
+                response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+                response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-API-Key'
+                response.headers['Access-Control-Allow-Credentials'] = 'true'
+            return response
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Chrome extension connection working',
+            'timestamp': time.time(),
+            'server': 'Eclipse Shield Secure Local'
+        })
+    
+    @app.route('/ext-popup')
+    def ext_popup():
+        """Serve extension popup for iframe embedding with fallback storage."""
+        try:
+            logger.info("ext_popup route called")
+            # Read popup.html and add fallback storage
+            with open('extension/popup.html', 'r') as f:
+                popup_html = f.read()
+            
+            logger.info(f"Read popup.html, size: {len(popup_html)}")
+            
+            # Insert fallback script just before the </body> tag
+            original_len = len(popup_html)
+            popup_html = popup_html.replace(
+                '</body>',
+                '<script>console.log("INJECTED BY FLASK - TEST");</script>\n</body>'
+            )
+            
+            logger.info(f"After replacement, size: {len(popup_html)}, changed: {len(popup_html) != original_len}")
+            
+            response = make_response(popup_html)
+            response.headers['Content-Type'] = 'text/html'
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error serving ext-popup: {e}")
+            return jsonify({'error': 'Extension popup unavailable'}), 500
+
+    @app.route('/popup.js')
+    def popup_js():
+        """Serve popup.js for ext-popup context."""
+        try:
+            response = make_response(send_from_directory('extension', 'popup.js'))
+            response.headers['Content-Type'] = 'application/javascript'
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            return response
+        except Exception as e:
+            logger.error(f"Error serving popup.js: {e}")
+            return jsonify({'error': 'JavaScript file unavailable'}), 500
+    
+    @app.route('/background.js')
+    def background_js():
+        """Serve background.js if needed for ext-popup context."""
+        try:
+            response = make_response(send_from_directory('extension', 'background.js'))
+            response.headers['Content-Type'] = 'application/javascript'
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            return response
+        except Exception as e:
+            logger.error(f"Error serving background.js: {e}")
+            return jsonify({'error': 'JavaScript file unavailable'}), 500
+    
+    @app.route('/popup-iframe.js')
+    def popup_iframe_js():
+        """Serve popup.js modified for iframe context with fallback storage."""
+        try:
+            # Read the original popup.js
+            with open('extension/popup.js', 'r') as f:
+                popup_js = f.read()
+            
+            # Add fallback for when message passing fails
+            iframe_modifications = """
+// Iframe-specific modifications for Eclipse Shield
+(function() {
+    let messagePassingAvailable = false;
+    let fallbackStorage = {};
+    
+    // Test if message passing is working
+    function testMessagePassing() {
+        return new Promise((resolve) => {
+            const testChannel = new MessageChannel();
+            let responded = false;
+            
+            testChannel.port1.onmessage = () => {
+                responded = true;
+                resolve(true);
+            };
+            
+            try {
+                window.parent.postMessage({
+                    type: 'storage-get',
+                    keys: ['test']
+                }, '*', [testChannel.port2]);
+                
+                // Timeout if no response
+                setTimeout(() => {
+                    if (!responded) resolve(false);
+                }, 1000);
+            } catch (e) {
+                resolve(false);
+            }
+        });
+    }
+    
+    // Enhanced chromeStorage with fallback
+    const originalChromeStorage = window.chromeStorage || {};
+    window.chromeStorage = {
+        get: function(keys) {
+            if (typeof keys === 'string') keys = [keys];
+            
+            return new Promise((resolve) => {
+                if (messagePassingAvailable) {
+                    const channel = new MessageChannel();
+                    channel.port1.onmessage = (event) => {
+                        resolve(event.data.result || {});
+                    };
+                    
+                    try {
+                        window.parent.postMessage({
+                            type: 'storage-get',
+                            keys: keys
+                        }, '*', [channel.port2]);
+                    } catch (e) {
+                        console.log('Message passing failed, using fallback storage');
+                        const result = {};
+                        keys.forEach(key => {
+                            result[key] = fallbackStorage[key];
+                        });
+                        resolve(result);
+                    }
+                } else {
+                    console.log('Using fallback storage for get:', keys);
+                    const result = {};
+                    keys.forEach(key => {
+                        result[key] = fallbackStorage[key];
+                    });
+                    resolve(result);
+                }
+            });
+        },
+        
+        set: function(items) {
+            return new Promise((resolve) => {
+                if (messagePassingAvailable) {
+                    const channel = new MessageChannel();
+                    channel.port1.onmessage = () => resolve();
+                    
+                    try {
+                        window.parent.postMessage({
+                            type: 'storage-set',
+                            items: items
+                        }, '*', [channel.port2]);
+                    } catch (e) {
+                        console.log('Message passing failed, using fallback storage for set');
+                        Object.assign(fallbackStorage, items);
+                        resolve();
+                    }
+                } else {
+                    console.log('Using fallback storage for set:', items);
+                    Object.assign(fallbackStorage, items);
+                    resolve();
+                }
+            });
+        }
+    };
+    
+    // Test message passing on load
+    document.addEventListener('DOMContentLoaded', async () => {
+        console.log('Testing iframe message passing...');
+        messagePassingAvailable = await testMessagePassing();
+        console.log('Message passing available:', messagePassingAvailable);
+        
+        if (!messagePassingAvailable) {
+            console.log('Initializing with fallback storage - buttons should work now');
+            // Initialize with empty storage to allow UI to work
+            fallbackStorage = {
+                formState: {
+                    activeSection: 'blockDurationSelect',
+                    blockDuration: 30,
+                    durationUnit: 'minutes'
+                }
+            };
+        }
+    });
+})();
+
+"""
+            
+            # Prepend the iframe modifications to the original popup.js
+            modified_js = iframe_modifications + '\n\n' + popup_js
+            
+            response = make_response(modified_js)
+            response.headers['Content-Type'] = 'application/javascript'
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error serving iframe popup.js: {e}")
+            return jsonify({'error': 'JavaScript file unavailable'}), 500
+
+    @app.route('/ext-popup-iframe')
+    def ext_popup_iframe():
+        """Serve extension popup with iframe-optimized JavaScript."""
+        try:
+            # Read popup.html and modify it to use the iframe-optimized JS
+            with open('extension/popup.html', 'r') as f:
+                popup_html = f.read()
+            
+            # Replace the script reference
+            popup_html = popup_html.replace(
+                '<script src="popup.js"></script>',
+                '<script src="popup-iframe.js"></script>'
+            )
+            
+            response = make_response(popup_html)
+            response.headers['Content-Type'] = 'text/html'
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error serving iframe popup: {e}")
+            return jsonify({'error': 'Extension popup unavailable'}), 500
+
+    @app.route('/debug-popup')
+    def debug_popup():
+        """Debug route to test popup functionality without iframe restrictions."""
+        try:
+            # Read the popup.html file and modify it for standalone testing
+            popup_html = None
+            with open('extension/popup.html', 'r') as f:
+                popup_html = f.read()
+            
+            # Add some debug JavaScript to help diagnose issues
+            debug_script = """
+    <script>
+        // Override chromeStorage for standalone testing
+        window.chromeStorage = {
+            get: function(keys) {
+                console.log('Debug: chromeStorage.get called with keys:', keys);
+                return Promise.resolve({});
+            },
+            set: function(items) {
+                console.log('Debug: chromeStorage.set called with items:', items);
+                return Promise.resolve();
+            }
+        };
+        
+        // Debug message to show when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Debug: DOM loaded for debug popup');
+            console.log('Debug: Available buttons:', {
+                startBlock: !!document.getElementById('startBlock'),
+                startContext: !!document.getElementById('startContext'),
+                nextQuestion: !!document.getElementById('nextQuestion')
+            });
+        });
+    </script>
+    """
+            
+            # Insert debug script before the popup.js script tag
+            popup_html = popup_html.replace('<script src="popup.js"></script>', 
+                                          debug_script + '\n    <script src="popup.js"></script>')
+            
+            response = make_response(popup_html)
+            response.headers['Content-Type'] = 'text/html'
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error serving debug popup: {e}")
+            return jsonify({'error': 'Debug popup unavailable'}), 500
+
+    @app.route('/test')
+    def test_page():
+        """Serve test page for browser connection testing."""
+        try:
+            return send_from_directory('.', 'test-browser.html')
+        except Exception as e:
+            logger.error(f"Error serving test page: {e}")
+            return jsonify({'error': 'Test page unavailable'}), 500
+    
+    @app.route('/test-injection')
+    def test_injection():
+        """Test route to verify injection works."""
+        return "INJECTION TEST WORKING"
+    
+    @app.route('/matrix-animation.html')
+    def matrix_animation():
+        """Serve matrix animation HTML for extension iframe."""
+        try:
+            # Serve the matrix animation from the extension folder
+            with open('extension/matrix-animation/index.html', 'r') as f:
+                matrix_html = f.read()
+            
+            # Inject a base tag to fix all relative paths at once
+            # This tells the browser to resolve all relative URLs relative to the matrix-animation directory
+            base_tag = '<base href="/extension/matrix-animation/">';
+            
+            # Insert the base tag after the <head> tag
+            if '<head>' in matrix_html:
+                matrix_html = matrix_html.replace('<head>', f'<head>\n\t\t{base_tag}')
+            else:
+                # Fallback: insert after <meta charset> if no <head> tag
+                matrix_html = matrix_html.replace('<meta charset="utf-8" />', f'<meta charset="utf-8" />\n\t\t{base_tag}')
+            
+            response = make_response(matrix_html)
+            response.headers['Content-Type'] = 'text/html'
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            
+            # Remove frame-ancestors restrictions for matrix animation
+            response.headers['X-Frame-Options'] = 'ALLOWALL'
+            response.headers.pop('X-Frame-Options', None)  # Remove if exists
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error serving matrix animation: {e}")
+            # Return a simple fallback matrix animation
+            fallback_html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <base href="/extension/matrix-animation/">
+                <style>
+                    body { margin: 0; padding: 0; background: #000; overflow: hidden; }
+                    canvas { display: block; }
+                </style>
+            </head>
+            <body>
+                <canvas id="matrix"></canvas>
+                <script>
+                    const canvas = document.getElementById('matrix');
+                    const ctx = canvas.getContext('2d');
+                    
+                    canvas.width = window.innerWidth;
+                    canvas.height = window.innerHeight;
+                    
+                    const matrix = "ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789@#$%^&*()*&^%+-/~{[|`]}";
+                    const matrixArray = matrix.split("");
+                    
+                    const fontSize = 10;
+                    const columns = canvas.width/fontSize;
+                    const drops = [];
+                    
+                    for(let x = 0; x < columns; x++) {
+                        drops[x] = 1; 
+                    }
+                    
+                    function draw() {
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.04)';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        
+                        ctx.fillStyle = '#0F0';
+                        ctx.font = fontSize + 'px arial';
+                        
+                        for(let i = 0; i < drops.length; i++) {
+                            const text = matrixArray[Math.floor(Math.random()*matrixArray.length)];
+                            ctx.fillText(text, i*fontSize, drops[i]*fontSize);
+                            
+                            if(drops[i]*fontSize > canvas.height && Math.random() > 0.975) {
+                                drops[i] = 0;
+                            }
+                            drops[i]++;
+                        }
+                    }
+                    
+                    setInterval(draw, 35);
+                </script>
+            </body>
+            </html>
+            """
+            return make_response(fallback_html)
+
+    @app.route('/matrix-animation/')
+    @app.route('/matrix-animation/index.html')
+    def matrix_animation_with_path():
+        """Serve matrix animation HTML with path-based routing for extension iframe."""
+        try:
+            # Serve the matrix animation from the extension folder
+            with open('extension/matrix-animation/index.html', 'r') as f:
+                matrix_html = f.read()
+            
+            # Inject a base tag to fix all relative paths at once
+            # This tells the browser to resolve all relative URLs relative to the matrix-animation directory
+            base_tag = '<base href="/extension/matrix-animation/">';
+            
+            # Insert the base tag after the <head> tag
+            if '<head>' in matrix_html:
+                matrix_html = matrix_html.replace('<head>', f'<head>\n\t\t{base_tag}')
+            else:
+                # Fallback: insert after <meta charset> if no <head> tag
+                matrix_html = matrix_html.replace('<meta charset="utf-8" />', f'<meta charset="utf-8" />\n\t\t{base_tag}')
+            
+            response = make_response(matrix_html)
+            response.headers['Content-Type'] = 'text/html'
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            
+            # Remove frame-ancestors restrictions for matrix animation
+            response.headers['X-Frame-Options'] = 'ALLOWALL'
+            response.headers.pop('X-Frame-Options', None)  # Remove if exists
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error serving matrix animation with path: {e}")
+            # Return a simple fallback matrix animation
+            fallback_html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <base href="/extension/matrix-animation/">
+                <style>
+                    body { margin: 0; padding: 0; background: #000; overflow: hidden; }
+                    canvas { display: block; }
+                </style>
+            </head>
+            <body>
+                <canvas id="matrix"></canvas>
+                <script>
+                    const canvas = document.getElementById('matrix');
+                    const ctx = canvas.getContext('2d');
+                    
+                    canvas.width = window.innerWidth;
+                    canvas.height = window.innerHeight;
+                    
+                    const matrix = "ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789@#$%^&*()*&^%+-/~{[|`]}";
+                    const matrixArray = matrix.split("");
+                    
+                    const fontSize = 10;
+                    const columns = canvas.width/fontSize;
+                    const drops = [];
+                    
+                    for(let x = 0; x < columns; x++) {
+                        drops[x] = 1; 
+                    }
+                    
+                    function draw() {
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.04)';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        
+                        ctx.fillStyle = '#0F0';
+                        ctx.font = fontSize + 'px arial';
+                        
+                        for(let i = 0; i < drops.length; i++) {
+                            const text = matrixArray[Math.floor(Math.random()*matrixArray.length)];
+                            ctx.fillText(text, i*fontSize, drops[i]*fontSize);
+                            
+                            if(drops[i]*fontSize > canvas.height && Math.random() > 0.975) {
+                                drops[i] = 0;
+                            }
+                            drops[i]++;
+                        }
+                    }
+                    
+                    setInterval(draw, 35);
+                </script>
+            </body>
+            </html>
+            """
+            return make_response(fallback_html)
+
+    @app.route('/matrix-animation-wrapper.html')
+    def matrix_animation_wrapper():
+        """Serve matrix animation wrapper HTML."""
+        try:
+            return send_from_directory('extension', 'matrix-animation-wrapper.html')
+        except Exception as e:
+            logger.error(f"Error serving matrix animation wrapper: {e}")
+            return jsonify({'error': 'Wrapper not found'}), 404
+
+    @app.route('/matrix-sandbox.html')
+    def matrix_sandbox():
+        """Serve matrix animation sandbox HTML."""
+        try:
+            return send_from_directory('extension', 'matrix-sandbox.html')
+        except Exception as e:
+            logger.error(f"Error serving matrix sandbox: {e}")
+            return jsonify({'error': 'Sandbox not found'}), 404
+
+    # Periodic cleanup task
+    def cleanup_task():
+        """Periodic cleanup of cache and security data."""
+        while True:
+            time.sleep(300)  # Run every 5 minutes
+            try:
+                clear_expired_cache()
+                security_middleware.cleanup_failed_attempts()
+            except Exception as e:
+                logger.error(f"Cleanup task error: {e}")
+    
+    # Start cleanup thread
+    cleanup_thread = threading.Thread(target=cleanup_task, daemon=True)
+    cleanup_thread.start()
+    
+    logger.info("Secure Eclipse Shield application initialized")
+    return app
+
+if __name__ == '__main__':
+    app = create_app('development')
+    print("🛡️  Eclipse Shield - Secure Local Mode")
+    print("=====================================")
+    print("🌐 Starting server at: http://localhost:5000")
+    print("❤️  Health check at: http://localhost:5000/health")
+    print("🔒 Security features: ENABLED")
+    print("📊 Monitoring: Active")
+    print("")
+    app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)

@@ -1,0 +1,369 @@
+name: Security Report
+description: Report a security vulnerability or security-related concern
+title: "[SECURITY] "
+labels: ["security", "urgent", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## ⚠️ Security Report Submission ⚠️
+        
+        **IMPORTANT**: If you've discovered a critical security vulnerability that could be exploited, please consider reporting it privately first through a direct message or other secure communication channel instead of creating a public issue.
+        
+        For non-critical security concerns, documentation improvements, or general security discussions, this form is appropriate.
+
+  - type: checkboxes
+    id: security-acknowledgment
+    attributes:
+      label: Security Reporting Acknowledgment
+      description: Please confirm your understanding of responsible disclosure
+      options:
+        - label: I understand this is for non-critical security issues or general security improvements
+          required: true
+        - label: I have not included sensitive information that could aid attackers
+          required: true
+        - label: I am following responsible disclosure practices
+          required: true
+
+  - type: dropdown
+    id: severity-level
+    attributes:
+      label: Severity Level
+      description: How severe is this security concern?
+      options:
+        - Critical - Immediate threat, active exploitation possible
+        - High - Significant security risk, needs urgent attention
+        - Medium - Important security issue, should be addressed soon
+        - Low - Minor security improvement or hardening opportunity
+        - Informational - Security-related question or documentation issue
+    validations:
+      required: true
+
+  - type: dropdown
+    id: vulnerability-type
+    attributes:
+      label: Vulnerability Type
+      description: What type of security issue is this?
+      options:
+        - Input Validation (XSS, SQL Injection, etc.)
+        - Authentication/Authorization bypass
+        - Session Management issues
+        - Insecure Direct Object References
+        - Security Misconfiguration
+        - Sensitive Data Exposure
+        - Insufficient Attack Protection
+        - Cross-Site Request Forgery (CSRF)
+        - Insecure Components/Dependencies
+        - Insufficient Logging & Monitoring
+        - API Security issues
+        - Browser Extension Security
+        - Infrastructure/Deployment Security
+        - Cryptographic Issues
+        - Business Logic Vulnerabilities
+        - Denial of Service (DoS)
+        - Information Disclosure
+        - Security Documentation/Process Issue
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: affected-component
+    attributes:
+      label: Affected Component
+      description: Which part of Eclipse Shield is affected?
+      options:
+        - Backend API (Flask application)
+        - Browser Extension (Chrome/Opera)
+        - AI/ML Integration (Gemini API)
+        - Authentication System
+        - Rate Limiting System
+        - Input Validation Layer
+        - Session Management
+        - Configuration System
+        - Logging/Monitoring
+        - Deployment Scripts
+        - Network Security (Nginx/UFW)
+        - Docker Configuration
+        - Dependencies/Third-party libraries
+        - Documentation/Procedures
+        - Multiple components
+        - Unknown/Unclear
+    validations:
+      required: true
+
+  - type: textarea
+    id: vulnerability-summary
+    attributes:
+      label: Vulnerability Summary
+      description: Brief, non-sensitive description of the security issue
+      placeholder: "Input validation bypass in user settings endpoint allows..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact-assessment
+    attributes:
+      label: Impact Assessment
+      description: |
+        What could an attacker potentially do with this vulnerability?
+        - What data could be accessed?
+        - What actions could be performed?
+        - Who would be affected?
+      placeholder: |
+        An attacker could potentially:
+        - Access user configuration data
+        - Bypass rate limiting protections
+        - Execute unauthorized API calls
+        - Impact: All users of the web interface
+    validations:
+      required: true
+
+  - type: dropdown
+    id: attack-vector
+    attributes:
+      label: Attack Vector
+      description: How could this vulnerability be exploited?
+      options:
+        - Remote - Over the network/internet
+        - Local - Requires local system access
+        - Physical - Requires physical access
+        - Social Engineering - Requires user interaction
+        - Privilege Escalation - Requires existing access
+        - Multiple vectors possible
+        - Unknown/Unclear
+    validations:
+      required: true
+
+  - type: dropdown
+    id: authentication-required
+    attributes:
+      label: Authentication Required
+      description: Does exploiting this require authentication?
+      options:
+        - No authentication required
+        - Basic user authentication required
+        - Admin authentication required
+        - Special privileges required
+        - Unknown/Varies
+    validations:
+      required: true
+
+  - type: textarea
+    id: affected-versions
+    attributes:
+      label: Affected Versions
+      description: |
+        Which versions are affected? Include commit hashes if known.
+        Check the latest version if possible.
+      placeholder: |
+        - Latest main branch (commit: abc123...)
+        - All versions since v1.2.0
+        - Unknown - haven't tested multiple versions
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: |
+        Provide steps to reproduce the issue. Be careful not to include sensitive information.
+        Use placeholder data where appropriate.
+      placeholder: |
+        1. Navigate to /api/settings endpoint
+        2. Send POST request with payload: {"setting": "<script>alert('xss')</script>"}
+        3. Observe that script is executed when settings are displayed
+        4. Impact: XSS vulnerability in settings display
+    validations:
+      required: true
+
+  - type: textarea
+    id: current-behavior
+    attributes:
+      label: Current Behavior
+      description: What happens currently with this security issue?
+      placeholder: "User input is not properly sanitized and is reflected in the response without encoding..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Secure Behavior
+      description: What should happen instead to be secure?
+      placeholder: "User input should be validated, sanitized, and encoded before being stored or displayed..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: mitigation-suggestions
+    attributes:
+      label: Suggested Mitigation
+      description: |
+        Do you have suggestions for how to fix this issue?
+        Include specific recommendations if possible.
+      placeholder: |
+        - Implement input validation using HTML escaping
+        - Add Content Security Policy headers
+        - Use parameterized queries for database operations
+        - Update vulnerable dependency to version X.Y.Z
+    validations:
+      required: false
+
+  - type: dropdown
+    id: exploitability
+    attributes:
+      label: Exploitability Assessment
+      description: How easy is this to exploit?
+      options:
+        - Very Easy - Can be exploited with basic tools/knowledge
+        - Easy - Requires some technical knowledge
+        - Medium - Requires specialized tools or techniques
+        - Hard - Requires significant expertise or complex conditions
+        - Very Hard - Requires exceptional circumstances or skills
+        - Unknown - Haven't attempted to exploit
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment-details
+    attributes:
+      label: Environment Details
+      description: |
+        Provide details about your testing environment:
+        - Operating System
+        - Browser (if relevant)
+        - Python version
+        - Deployment method (Docker, local, etc.)
+      placeholder: |
+        - OS: macOS Monterey 12.6
+        - Browser: Chrome 118.0
+        - Python: 3.11.4
+        - Deployment: Local development server
+        - Docker: Version 24.0.6
+    validations:
+      required: true
+
+  - type: textarea
+    id: detection-methods
+    attributes:
+      label: Detection Methods
+      description: |
+        How did you discover this vulnerability?
+        - Security scanning tools used
+        - Manual testing approach
+        - Code review findings
+        - Third-party reports
+      placeholder: |
+        - Manual testing of input validation
+        - OWASP ZAP security scan
+        - Code review of authentication logic
+        - Dependency vulnerability scanner (safety/bandit)
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: owasp-categories
+    attributes:
+      label: OWASP Top 10 Categories
+      description: Which OWASP Top 10 categories does this relate to?
+      options:
+        - label: A01:2021 - Broken Access Control
+        - label: A02:2021 - Cryptographic Failures
+        - label: A03:2021 - Injection
+        - label: A04:2021 - Insecure Design
+        - label: A05:2021 - Security Misconfiguration
+        - label: A06:2021 - Vulnerable and Outdated Components
+        - label: A07:2021 - Identification and Authentication Failures
+        - label: A08:2021 - Software and Data Integrity Failures
+        - label: A09:2021 - Security Logging and Monitoring Failures
+        - label: A10:2021 - Server-Side Request Forgery (SSRF)
+
+  - type: textarea
+    id: compliance-impact
+    attributes:
+      label: Compliance Impact
+      description: |
+        Does this issue impact any compliance requirements or security standards?
+        Consider GDPR, CCPA, SOC2, ISO27001, etc.
+      placeholder: |
+        - Potential GDPR violation if personal data exposed
+        - May impact SOC2 security controls
+        - Could affect data residency requirements
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs-evidence
+    attributes:
+      label: Log Evidence
+      description: |
+        Include relevant log entries that show the security issue (sanitize sensitive data):
+        - Error logs
+        - Access logs
+        - Security event logs
+      placeholder: |
+        ```
+        2024-01-15 10:30:45 ERROR: Input validation bypassed for user_id=123
+        2024-01-15 10:30:45 WARN: Suspicious pattern detected in request payload
+        ```
+    validations:
+      required: false
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: |
+        Include relevant references:
+        - CVE numbers (if applicable)
+        - Security advisories
+        - Research papers
+        - Similar vulnerabilities in other projects
+      placeholder: |
+        - CVE-2023-XXXXX (similar vulnerability)
+        - OWASP Testing Guide: [link]
+        - Security research: [link]
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: testing-checklist
+    attributes:
+      label: Security Testing Checklist
+      description: What security testing have you performed?
+      options:
+        - label: Manual input validation testing
+        - label: Automated security scanning
+        - label: Authentication/authorization bypass testing
+        - label: Session management testing
+        - label: Injection testing (SQL, XSS, etc.)
+        - label: Configuration security review
+        - label: Dependency vulnerability check
+        - label: Network security testing
+
+  - type: textarea
+    id: additional-notes
+    attributes:
+      label: Additional Security Notes
+      description: |
+        Any additional information that would help understand or address this security issue:
+        - Related security concerns
+        - Defense-in-depth considerations
+        - Monitoring/detection recommendations
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: disclosure-timeline
+    attributes:
+      label: Disclosure Timeline
+      description: Please indicate your disclosure intentions
+      options:
+        - label: I plan to keep this private until fixed
+        - label: I may publish details after a reasonable fix timeline
+        - label: This is already public information
+        - label: I'm unsure about disclosure timeline

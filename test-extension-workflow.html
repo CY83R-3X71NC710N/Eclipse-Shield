@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Eclipse Shield - Extension Workflow Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #000;
+            color: #0f0;
+        }
+        h1 { color: #0ff; }
+        .step {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #0f0;
+            border-radius: 5px;
+        }
+        .step h3 { color: #ff0; margin-top: 0; }
+        button {
+            background: #0f0;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        button:hover { background: #0ff; }
+        a {
+            color: #0ff;
+            text-decoration: none;
+        }
+        a:hover { text-decoration: underline; }
+        .code {
+            background: #111;
+            padding: 10px;
+            border-radius: 3px;
+            font-family: monospace;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🛡️ Eclipse Shield - Extension Workflow Test</h1>
+    
+    <div class="step">
+        <h3>Step 1: Install Extension</h3>
+        <p>Load the Eclipse Shield extension from <code>/workspaces/Eclipse-Shield/extension/</code> as an unpacked extension in Chrome.</p>
+        <p>The extension should now use the Chrome background script with analysis functionality.</p>
+    </div>
+    
+    <div class="step">
+        <h3>Step 2: Start a Session</h3>
+        <p>Click on the extension icon and start a productivity session with a specific domain (e.g., "coding").</p>
+        <p>This creates an active session with context that will be used for analysis.</p>
+    </div>
+    
+    <div class="step">
+        <h3>Step 3: Test Search Workflow</h3>
+        <p>Open a new tab (should show the Eclipse Shield new tab page) and search for something like "JavaScript tutorials".</p>
+        <p>This should take you to Startpage search results.</p>
+    </div>
+    
+    <div class="step">
+        <h3>Step 4: Test Analysis</h3>
+        <p>Click on any search result from Startpage. The extension should:</p>
+        <ol>
+            <li>Detect the navigation</li>
+            <li>Show an "Analyzing..." block page</li>
+            <li>Send the URL to the Flask server for analysis</li>
+            <li>Either allow the site (if productive) or block it (if not productive)</li>
+        </ol>
+    </div>
+    
+    <div class="step">
+        <h3>Step 5: Direct URL Test</h3>
+        <p>Test direct navigation by typing URLs in the address bar:</p>
+        <ul>
+            <li><a href="https://stackoverflow.com" target="_blank">https://stackoverflow.com</a> (should be analyzed and likely allowed for coding)</li>
+            <li><a href="https://reddit.com" target="_blank">https://reddit.com</a> (should be analyzed and likely blocked)</li>
+            <li><a href="https://github.com" target="_blank">https://github.com</a> (should be analyzed and likely allowed for coding)</li>
+        </ul>
+    </div>
+    
+    <div class="step">
+        <h3>Expected Behavior</h3>
+        <p>With the updated manifest using <code>background-chrome.js</code>, the extension should now:</p>
+        <ul>
+            <li>✅ Intercept all navigation attempts</li>
+            <li>✅ Check for active sessions</li>
+            <li>✅ Send URLs to the Flask <code>/analyze</code> endpoint</li>
+            <li>✅ Show analysis UI (block.html) while processing</li>
+            <li>✅ Allow or block based on productivity analysis</li>
+            <li>✅ Cache decisions to avoid re-analyzing the same URLs</li>
+        </ul>
+    </div>
+    
+    <div class="step">
+        <h3>Debugging</h3>
+        <p>If issues persist:</p>
+        <ol>
+            <li>Open Chrome DevTools → Extensions → Eclipse Shield → Service Worker → Console</li>
+            <li>Check for background script logs and errors</li>
+            <li>Verify that the Flask server at <a href="http://localhost:5000/health">localhost:5000</a> is accessible</li>
+            <li>Check if the extension has all required permissions</li>
+        </ol>
+        <div class="code">
+            Console commands for debugging:<br>
+            chrome.storage.local.get(null, console.log)  // Check stored data<br>
+            chrome.storage.local.clear()  // Clear all data<br>
+        </div>
+    </div>
+    
+    <div class="step">
+        <h3>Server Status</h3>
+        <p>Flask Server: <a href="http://localhost:5000/health" target="_blank">Health Check</a></p>
+        <p>Matrix Animation: <a href="http://localhost:5000/matrix-animation-wrapper.html" target="_blank">Test Wrapper</a></p>
+        <button onclick="testConnection()">Test Server Connection</button>
+        <div id="connectionResult"></div>
+    </div>
+    
+    <script>
+        async function testConnection() {
+            const result = document.getElementById('connectionResult');
+            try {
+                const response = await fetch('http://localhost:5000/health');
+                const data = await response.json();
+                result.innerHTML = `<p style="color: #0f0;">✅ Server is healthy: ${JSON.stringify(data)}</p>`;
+            } catch (error) {
+                result.innerHTML = `<p style="color: #f00;">❌ Server connection failed: ${error.message}</p>`;
+            }
+        }
+        
+        // Test connection on page load
+        testConnection();
+    </script>
+</body>
+</html>

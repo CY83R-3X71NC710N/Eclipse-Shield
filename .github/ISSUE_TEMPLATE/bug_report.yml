@@ -1,0 +1,219 @@
+name: Bug Report
+description: Report a bug or issue with Eclipse Shield
+title: "[BUG] "
+labels: ["bug", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Thanks for reporting a bug! 🐛
+        
+        Please provide as much detail as possible to help us understand and reproduce the issue.
+        
+        **Security Note**: If this is a security vulnerability, please **DO NOT** file a public issue. Instead, use the Security Report template or contact the maintainer through secure channels.
+
+  - type: checkboxes
+    id: preliminary-checks
+    attributes:
+      label: Preliminary Checks
+      description: Please confirm you have completed these steps
+      options:
+        - label: I have searched existing issues and this is not a duplicate
+          required: true
+        - label: I have read the troubleshooting guide
+          required: true
+        - label: This is not a security vulnerability (those should be reported through secure channels)
+          required: true
+
+  - type: dropdown
+    id: bug-type
+    attributes:
+      label: Bug Type
+      description: What type of issue are you experiencing?
+      options:
+        - Application crashes or errors
+        - Browser extension not working
+        - API endpoints not responding correctly
+        - Installation or setup issues
+        - Performance issues
+        - UI/UX problems
+        - Documentation issues
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: bug-description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is
+      placeholder: Describe what happened and what you expected to happen
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Detailed steps to reproduce the behavior
+      placeholder: |
+        1. Start Eclipse Shield with './start.sh'
+        2. Navigate to 'https://example.com'
+        3. Extension shows error message
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: What should have happened?
+      placeholder: Extension should display block page with context question
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: Extension shows generic error message instead
+    validations:
+      required: true
+
+  - type: dropdown
+    id: operating-system
+    attributes:
+      label: Operating System
+      description: What operating system are you using?
+      options:
+        - macOS (Intel)
+        - macOS (Apple Silicon)
+        - Ubuntu/Debian
+        - CentOS/RHEL
+        - Windows 10
+        - Windows 11
+        - Other Linux
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: os-version
+    attributes:
+      label: OS Version
+      description: Specific version of your operating system
+      placeholder: e.g., macOS 12.6, Ubuntu 20.04, Windows 11
+    validations:
+      required: true
+
+  - type: input
+    id: python-version
+    attributes:
+      label: Python Version
+      description: Output of `python3 --version`
+      placeholder: e.g., Python 3.9.7
+    validations:
+      required: true
+
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      description: Which browser are you using? (if relevant)
+      options:
+        - Google Chrome
+        - Opera
+        - Chromium
+        - Not applicable
+        - Other
+    validations:
+      required: false
+
+  - type: input
+    id: browser-version
+    attributes:
+      label: Browser Version
+      description: Browser version (if relevant)
+      placeholder: e.g., Chrome 96.0.4664.110
+    validations:
+      required: false
+
+  - type: input
+    id: eclipse-shield-version
+    attributes:
+      label: Eclipse Shield Version
+      description: Version of Eclipse Shield you're using
+      placeholder: e.g., v1.0.0, commit hash, or "latest from main"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      description: |
+        Please include relevant log entries. 
+        **Important**: Remove any sensitive information like API keys, personal data, or private URLs
+      placeholder: |
+        [2025-07-25 10:30:00] ERROR - Extension communication failed
+        [2025-07-25 10:30:01] WARNING - Retrying connection...
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: configuration
+    attributes:
+      label: Configuration Details
+      description: |
+        Any relevant configuration details (sanitized)
+        **Remove API keys and sensitive data**
+      placeholder: |
+        Environment: development
+        Rate limiting: enabled
+        Redis: localhost:6379
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: |
+        Any other context about the problem
+        - Screenshots (if helpful)
+        - Error messages
+        - Related issues
+        - Workarounds you've tried
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: tested-scenarios
+    attributes:
+      label: Testing Scenarios
+      description: Have you tested any of these scenarios?
+      options:
+        - label: Fresh installation on clean system
+        - label: Different browser/browser version
+        - label: Different websites/URLs
+        - label: Different productivity contexts
+        - label: Cleared browser extension data
+        - label: Restarted Eclipse Shield service
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How urgent is this issue for you?
+      options:
+        - Low - Minor inconvenience
+        - Medium - Affects some functionality
+        - High - Blocks major functionality
+        - Critical - Application unusable
+    validations:
+      required: true

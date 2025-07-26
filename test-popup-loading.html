@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Popup Loading</title>
+</head>
+<body>
+    <h1>Testing Eclipse Shield Popup</h1>
+    <iframe 
+        id="test-frame" 
+        src="http://localhost:5000/ext-popup" 
+        width="500" 
+        height="300"
+        style="border: 1px solid #ccc;">
+    </iframe>
+    
+    <script>
+        // Listen for console messages from the iframe
+        window.addEventListener('message', function(event) {
+            console.log('Message from iframe:', event.data);
+        });
+        
+        // Check if the iframe loads successfully
+        document.getElementById('test-frame').onload = function() {
+            console.log('Iframe loaded successfully');
+            
+            // Try to access the iframe content after a short delay
+            setTimeout(() => {
+                try {
+                    const iframe = document.getElementById('test-frame');
+                    console.log('Iframe location:', iframe.contentWindow.location.href);
+                } catch (e) {
+                    console.log('Cross-origin restriction (expected):', e.message);
+                }
+            }, 1000);
+        };
+        
+        document.getElementById('test-frame').onerror = function() {
+            console.log('Iframe failed to load');
+        };
+    </script>
+</body>
+</html>
